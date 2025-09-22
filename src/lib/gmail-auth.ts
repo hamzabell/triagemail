@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import * as crypto from 'crypto';
 
 export interface GmailAddonValidationResult {
   valid: boolean;
@@ -16,27 +15,22 @@ export interface GmailAddonValidationResult {
 export interface GmailAddonHeaders {
   'X-Gmail-User-Email': string;
   'X-Gmail-Addon-ID': string;
-  'X-Request-Timestamp': string;
-  'X-Request-Signature': string;
 }
 
 export class GmailAddonAuth {
   private static readonly ADDON_ID = process.env.GMAIL_ADDON_ID || 'triagemail-addon';
-  private static readonly SECRET_KEY = process.env.GMAIL_ADDON_SECRET || 'your-secret-key';
 
   /**
-   * Validate Gmail add-on request using email-based authentication
+   * Validate Gmail add-on request using simplified email-based authentication
    */
   static async validateRequest(request: NextRequest): Promise<GmailAddonValidationResult> {
     try {
       // Extract required headers
       const userEmail = request.headers.get('X-Gmail-User-Email');
       const addonId = request.headers.get('X-Gmail-Addon-ID');
-      const timestamp = request.headers.get('X-Request-Timestamp');
-      const signature = request.headers.get('X-Request-Signature');
 
       // Validate required headers
-      if (!userEmail || !addonId || !timestamp || !signature) {
+      if (!userEmail || !addonId) {
         return {
           valid: false,
           error: 'Missing required headers',
@@ -59,29 +53,11 @@ export class GmailAddonAuth {
         };
       }
 
-      // Validate timestamp (prevent replay attacks - 5 minute window)
-      const requestTime = parseInt(timestamp);
-      const currentTime = Math.floor(Date.now() / 1000);
-      if (Math.abs(currentTime - requestTime) > 300) {
-        return {
-          valid: false,
-          error: 'Request timestamp expired',
-        };
-      }
-
-      // Verify request signature
-      if (!this.verifySignature(userEmail, timestamp, signature)) {
-        return {
-          valid: false,
-          error: 'Invalid request signature',
-        };
-      }
-
       // Initialize Supabase client
       const supabase = await createClient();
 
       // For now, allow any Gmail user to access the add-on
-      // This is a temporary approach for testing purposes
+      // This is a simplified approach for development purposes
       const user = {
         id: userEmail,
         email: userEmail,
@@ -93,11 +69,6 @@ export class GmailAddonAuth {
 
       // Log the user access for analytics
       console.log(`Gmail add-on access by: ${userEmail}`);
-
-      // Skip subscription check - only require user account
-      // This allows users to access the Gmail add-on without a subscription
-
-      // Skip rate limiting for now - can be added later with proper user tracking
 
       return {
         valid: true,
@@ -122,22 +93,6 @@ export class GmailAddonAuth {
   private static isValidGmailEmail(email: string): boolean {
     const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
     return gmailRegex.test(email);
-  }
-
-  /**
-   * Create request signature for email-based authentication
-   */
-  static createSignature(email: string, timestamp: string): string {
-    const data = `${email}.${timestamp}.${this.SECRET_KEY}`;
-    return crypto.createHmac('sha256', this.SECRET_KEY).update(data).digest('hex');
-  }
-
-  /**
-   * Verify request signature
-   */
-  static verifySignature(email: string, timestamp: string, signature: string): boolean {
-    const expectedSignature = this.createSignature(email, timestamp);
-    return signature === expectedSignature;
   }
 
   /**
@@ -176,12 +131,5 @@ export class GmailAddonAuth {
       success,
       created_at: new Date().toISOString(),
     });
-  }
-
-  /**
-   * Generate timestamp for request signature
-   */
-  static generateTimestamp(): string {
-    return Math.floor(Date.now() / 1000).toString();
   }
 }

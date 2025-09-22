@@ -33,7 +33,6 @@ export async function POST(request: NextRequest) {
         email: validationResult.user?.email,
         name: validationResult.user?.name,
       },
-      timestamp: GmailAddonAuth.generateTimestamp(),
     });
   } catch (error) {
     console.error('Gmail add-on validation error:', error);
@@ -48,46 +47,17 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Generate a signature for the Gmail add-on client
+ * Health check endpoint for Gmail add-on authentication
  */
 export async function GET(request: NextRequest) {
   try {
-    const email = request.nextUrl.searchParams.get('email');
-
-    if (!email) {
-      return NextResponse.json(
-        {
-          error: 'Email parameter is required',
-          code: 'MISSING_EMAIL',
-        },
-        { status: 400 },
-      );
-    }
-
-    // Validate Gmail email format
-    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
-    if (!gmailRegex.test(email)) {
-      return NextResponse.json(
-        {
-          error: 'Invalid Gmail email format',
-          code: 'INVALID_EMAIL_FORMAT',
-        },
-        { status: 400 },
-      );
-    }
-
-    // Generate timestamp and signature for client-side use
-    const timestamp = GmailAddonAuth.generateTimestamp();
-    const signature = GmailAddonAuth.createSignature(email, timestamp);
-
     return NextResponse.json({
-      email,
-      timestamp,
-      signature,
+      success: true,
+      message: 'Gmail add-on authentication endpoint is available',
       addon_id: process.env.GMAIL_ADDON_ID || 'triagemail-addon',
     });
   } catch (error) {
-    console.error('Gmail add-on signature generation error:', error);
+    console.error('Gmail add-on health check error:', error);
     return NextResponse.json(
       {
         error: 'Internal server error',

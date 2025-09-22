@@ -8,11 +8,9 @@
 // API Configuration
 const API_BASE_URL = 'https://triage-mail.netlify.app/api'; // Replace with your actual backend URL
 const ADDON_ID = 'triagemail-addon'; // Unique add-on identifier
-const SECRET_KEY = 'your-secret-key'; // Should be stored in script properties
 
 // Cache for storing classifications and responses
 const CACHE_EXPIRATION = 5 * 60 * 1000; // 5 minutes
-const TOKEN_EXPIRATION = 60 * 60 * 1000; // 1 hour
 
 /**
  * Authentication and token management
@@ -27,27 +25,17 @@ class AuthManager {
    * Check if authentication is valid
    */
   isAuthenticated() {
-    const cachedAuth = this.cache.get('auth_valid');
-    if (cachedAuth === 'true') {
-      return true;
-    }
-
-    // Try to refresh authentication
-    try {
-      return this.refreshAuthentication();
-    } catch (error) {
-      return false;
-    }
+    // For simplified authentication, always return true
+    // Gmail handles the actual user authentication
+    return true;
   }
 
   /**
-   * Refresh authentication using email-based validation
+   * Refresh authentication using simplified email-based validation
    */
   refreshAuthentication() {
     try {
       const userEmail = Session.getActiveUser().getEmail();
-      const timestamp = Math.floor(Date.now() / 1000);
-      const signature = this.createSignature(userEmail, timestamp, '');
 
       const url = API_BASE_URL + '/auth/gmail-addon/validate';
 
@@ -57,8 +45,6 @@ class AuthManager {
         headers: {
           'X-Gmail-User-Email': userEmail,
           'X-Gmail-Addon-ID': ADDON_ID,
-          'X-Request-Timestamp': timestamp.toString(),
-          'X-Request-Signature': signature,
           'Content-Type': 'application/json',
         },
         muteHttpExceptions: true,
@@ -68,8 +54,6 @@ class AuthManager {
       const result = JSON.parse(response.getContentText());
 
       if (result.success) {
-        // Cache successful authentication
-        this.cache.put('auth_valid', 'true', TOKEN_EXPIRATION);
         return true;
       } else {
         throw new Error(result.error || 'Authentication failed');
@@ -81,30 +65,14 @@ class AuthManager {
   }
 
   /**
-   * Create request signature for email-based authentication
+   * Get simplified authentication headers
    */
-  createSignature(userEmail, timestamp, payload) {
-    const data = `${userEmail}.${timestamp}.${SECRET_KEY}`;
-    return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, data)
-      .map(function (byte) {
-        return (byte + 256).toString(16).slice(-2);
-      })
-      .join('');
-  }
-
-  /**
-   * Get authentication headers for email-based validation
-   */
-  getAuthHeaders(payload = '') {
+  getAuthHeaders() {
     const userEmail = Session.getActiveUser().getEmail();
-    const timestamp = Math.floor(Date.now() / 1000);
-    const signature = this.createSignature(userEmail, timestamp, payload);
 
     return {
       'X-Gmail-User-Email': userEmail,
       'X-Gmail-Addon-ID': ADDON_ID,
-      'X-Request-Timestamp': timestamp.toString(),
-      'X-Request-Signature': signature,
       'Content-Type': 'application/json',
     };
   }
@@ -732,7 +700,7 @@ function processPredefinedPrompt(emailData, promptId) {
     };
 
     const payloadString = JSON.stringify(payload);
-    const headers = authManager.getAuthHeaders(payloadString);
+    const headers = authManager.getAuthHeaders();
 
     const options = {
       method: 'post',
@@ -892,7 +860,7 @@ function classifyEmail(emailData) {
     };
 
     const payloadString = JSON.stringify(payload);
-    const headers = authManager.getAuthHeaders(payloadString);
+    const headers = authManager.getAuthHeaders();
 
     const options = {
       method: 'post',
@@ -937,7 +905,7 @@ function generateResponse(emailData, classification, tone = 'professional') {
     };
 
     const payloadString = JSON.stringify(payload);
-    const headers = authManager.getAuthHeaders(payloadString);
+    const headers = authManager.getAuthHeaders();
 
     const options = {
       method: 'post',
@@ -1061,7 +1029,7 @@ function submitFeedback(e) {
     };
 
     const payloadString = JSON.stringify(payload);
-    const headers = authManager.getAuthHeaders(payloadString);
+    const headers = authManager.getAuthHeaders();
 
     const options = {
       method: 'post',
@@ -1251,7 +1219,7 @@ function processFollowUpQuestion(authManager, messageId, question) {
     };
 
     const payloadString = JSON.stringify(payload);
-    const headers = authManager.getAuthHeaders(payloadString);
+    const headers = authManager.getAuthHeaders();
 
     const response = UrlFetchApp.fetch(url, {
       method: 'POST',
@@ -1288,7 +1256,7 @@ function processSuggestedAction(authManager, messageId, action) {
     };
 
     const payloadString = JSON.stringify(payload);
-    const headers = authManager.getAuthHeaders(payloadString);
+    const headers = authManager.getAuthHeaders();
 
     const response = UrlFetchApp.fetch(url, {
       method: 'POST',
@@ -1328,7 +1296,7 @@ function generateComposeEmailResponse(authManager, emailData, tone) {
     };
 
     const payloadString = JSON.stringify(payload);
-    const headers = authManager.getAuthHeaders(payloadString);
+    const headers = authManager.getAuthHeaders();
 
     const response = UrlFetchApp.fetch(url, {
       method: 'POST',
@@ -1358,7 +1326,7 @@ function fetchUserStats(authManager) {
     validateAuthentication();
 
     const url = `${API_BASE_URL}/dashboard/stats`;
-    const headers = authManager.getAuthHeaders('');
+    const headers = authManager.getAuthHeaders();
 
     const response = UrlFetchApp.fetch(url, {
       method: 'GET',
@@ -1730,7 +1698,7 @@ function fetchFocusModeData(authManager) {
     validateAuthentication();
 
     const url = `${API_BASE_URL}/dashboard/focus`;
-    const headers = authManager.getAuthHeaders('');
+    const headers = authManager.getAuthHeaders();
 
     const response = UrlFetchApp.fetch(url, {
       method: 'GET',

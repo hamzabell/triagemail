@@ -1,25 +1,11 @@
-const crypto = require('crypto');
-
 // Test configuration
 const userEmail = 'akandev888@gmail.com';
 const addonId = 'triagemail-addon';
-const secretKey = 'your-secret-key';
-const apiUrl = 'http://localhost:3001/api/auth/gmail-addon/validate';
-
-// Generate timestamp and signature
-function createSignature(email, timestamp, secretKey) {
-  const data = `${email}.${timestamp}.${secretKey}`;
-  return crypto.createHmac('sha256', secretKey).update(data).digest('hex');
-}
+const apiUrl = 'http://localhost:3000/api/auth/gmail-addon/validate';
 
 async function testAuthentication() {
-  const timestamp = Math.floor(Date.now() / 1000).toString();
-  const signature = createSignature(userEmail, timestamp, secretKey);
-
-  console.log('Testing authentication...');
+  console.log('Testing simplified authentication...');
   console.log('Email:', userEmail);
-  console.log('Timestamp:', timestamp);
-  console.log('Signature:', signature);
   console.log('Addon ID:', addonId);
 
   const payload = {
@@ -30,8 +16,6 @@ async function testAuthentication() {
   const headers = {
     'X-Gmail-User-Email': userEmail,
     'X-Gmail-Addon-ID': addonId,
-    'X-Request-Timestamp': timestamp,
-    'X-Request-Signature': signature,
     'Content-Type': 'application/json',
   };
 
