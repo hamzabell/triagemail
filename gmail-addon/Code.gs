@@ -6,9 +6,9 @@
  */
 
 // API Configuration
-const API_BASE_URL = 'https://triage-api.vercel.app/api'; // Replace with your actual backend URL
-const API_KEY = 'your-api-key'; // Should be stored in script properties
+const API_BASE_URL = 'https://triage-mail.netlify.app/api'; // Replace with your actual backend URL
 const ADDON_ID = 'triagemail-addon'; // Unique add-on identifier
+const SECRET_KEY = 'your-secret-key'; // Should be stored in script properties
 
 // Cache for storing classifications and responses
 const CACHE_EXPIRATION = 5 * 60 * 1000; // 5 minutes
@@ -24,41 +24,43 @@ class AuthManager {
   }
 
   /**
-   * Get or refresh authentication token
+   * Check if authentication is valid
    */
-  getToken() {
-    const cachedToken = this.cache.get('auth_token');
-    if (cachedToken) {
-      return cachedToken;
+  isAuthenticated() {
+    const cachedAuth = this.cache.get('auth_valid');
+    if (cachedAuth === 'true') {
+      return true;
     }
 
-    // Get user email and validate/refresh token
-    const userEmail = Session.getActiveUser().getEmail();
-    const newToken = this.refreshToken(userEmail);
-
-    if (newToken) {
-      this.cache.put('auth_token', newToken, TOKEN_EXPIRATION);
-      return newToken;
+    // Try to refresh authentication
+    try {
+      return this.refreshAuthentication();
+    } catch (error) {
+      return false;
     }
-
-    throw new Error('Unable to obtain authentication token');
   }
 
   /**
-   * Refresh authentication token from backend
+   * Refresh authentication using email-based validation
    */
-  refreshToken(userEmail) {
+  refreshAuthentication() {
     try {
+      const userEmail = Session.getActiveUser().getEmail();
+      const timestamp = Math.floor(Date.now() / 1000);
+      const signature = this.createSignature(userEmail, timestamp, '');
+
       const url = API_BASE_URL + '/auth/gmail-addon/validate';
-      const payload = {
-        email: userEmail,
-        apiKey: API_KEY,
-      };
 
       const options = {
         method: 'post',
         contentType: 'application/json',
-        payload: JSON.stringify(payload),
+        headers: {
+          'X-Gmail-User-Email': userEmail,
+          'X-Gmail-Addon-ID': ADDON_ID,
+          'X-Request-Timestamp': timestamp.toString(),
+          'X-Request-Signature': signature,
+          'Content-Type': 'application/json',
+        },
         muteHttpExceptions: true,
       };
 
@@ -66,21 +68,23 @@ class AuthManager {
       const result = JSON.parse(response.getContentText());
 
       if (result.success) {
-        return result.token;
+        // Cache successful authentication
+        this.cache.put('auth_valid', 'true', TOKEN_EXPIRATION);
+        return true;
       } else {
-        throw new Error(result.error || 'Token refresh failed');
+        throw new Error(result.error || 'Authentication failed');
       }
     } catch (error) {
-      Logger.log('Token refresh error: ' + error.toString());
+      Logger.log('Authentication refresh error: ' + error.toString());
       throw error;
     }
   }
 
   /**
-   * Create request signature for additional security
+   * Create request signature for email-based authentication
    */
-  createSignature(payload, timestamp) {
-    const data = payload + '.' + timestamp + '.' + API_KEY;
+  createSignature(userEmail, timestamp, payload) {
+    const data = `${userEmail}.${timestamp}.${SECRET_KEY}`;
     return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, data)
       .map(function (byte) {
         return (byte + 256).toString(16).slice(-2);
@@ -89,16 +93,15 @@ class AuthManager {
   }
 
   /**
-   * Get authenticated request headers
+   * Get authentication headers for email-based validation
    */
   getAuthHeaders(payload = '') {
-    const token = this.getToken();
+    const userEmail = Session.getActiveUser().getEmail();
     const timestamp = Math.floor(Date.now() / 1000);
-    const signature = this.createSignature(payload, timestamp);
+    const signature = this.createSignature(userEmail, timestamp, payload);
 
     return {
-      Authorization: 'Bearer ' + token,
-      'X-Gmail-User-Email': Session.getActiveUser().getEmail(),
+      'X-Gmail-User-Email': userEmail,
       'X-Gmail-Addon-ID': ADDON_ID,
       'X-Request-Timestamp': timestamp.toString(),
       'X-Request-Signature': signature,
@@ -717,6 +720,8 @@ function createComposeCard() {
  */
 function processPredefinedPrompt(emailData, promptId) {
   try {
+    validateAuthentication();
+
     const url = API_BASE_URL + '/email/prompt';
     const payload = {
       emailId: emailData.emailId,
@@ -875,6 +880,8 @@ function handlePredefinedPrompt(e) {
  */
 function classifyEmail(emailData) {
   try {
+    validateAuthentication();
+
     const url = API_BASE_URL + '/email/classify';
     const payload = {
       subject: emailData.subject,
@@ -1044,6 +1051,8 @@ function submitFeedback(e) {
   const feedback = e.parameters.feedback || '';
 
   try {
+    validateAuthentication();
+
     const url = API_BASE_URL + '/email/feedback';
     const payload = {
       responseId: messageId,
@@ -1051,13 +1060,14 @@ function submitFeedback(e) {
       feedback: feedback,
     };
 
+    const payloadString = JSON.stringify(payload);
+    const headers = authManager.getAuthHeaders(payloadString);
+
     const options = {
       method: 'post',
       contentType: 'application/json',
-      headers: {
-        Authorization: 'Bearer ' + API_KEY,
-      },
-      payload: JSON.stringify(payload),
+      headers: headers,
+      payload: payloadString,
       muteHttpExceptions: true,
     };
 
@@ -1180,6 +1190,37 @@ function openSettings() {
 
 // Helper Functions
 
+/**
+ * Validate authentication before making API calls
+ */
+function validateAuthentication() {
+  if (!authManager.isAuthenticated()) {
+    throw new Error('Authentication failed. Please ensure you have an active subscription.');
+  }
+}
+
+/**
+ * Test function for development
+ */
+function testClassification() {
+  const testEmail = {
+    subject: 'Urgent: Project Update Needed',
+    body: 'Please provide an update on the current project status by tomorrow.',
+    from: 'client@example.com',
+    emailId: 'test-email-id',
+    userId: 'test-user-id',
+  };
+
+  try {
+    const result = classifyEmail(testEmail);
+    Logger.log('Classification result: ' + JSON.stringify(result));
+    return result;
+  } catch (error) {
+    Logger.log('Test classification error: ' + error.toString());
+    return null;
+  }
+}
+
 function createCategoryWidget(category) {
   const colors = {
     Urgent: '#FF3366',
@@ -1200,7 +1241,8 @@ function createCategoryWidget(category) {
  */
 function processFollowUpQuestion(authManager, messageId, question) {
   try {
-    const token = authManager.getToken();
+    validateAuthentication();
+
     const url = `${API_BASE_URL}/email/follow-up`;
 
     const payload = {
@@ -1208,15 +1250,13 @@ function processFollowUpQuestion(authManager, messageId, question) {
       question: question,
     };
 
+    const payloadString = JSON.stringify(payload);
+    const headers = authManager.getAuthHeaders(payloadString);
+
     const response = UrlFetchApp.fetch(url, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'X-API-Key': API_KEY,
-        'X-Addon-Id': ADDON_ID,
-      },
-      payload: JSON.stringify(payload),
+      headers: headers,
+      payload: payloadString,
       muteHttpExceptions: true,
     });
 
@@ -1238,7 +1278,8 @@ function processFollowUpQuestion(authManager, messageId, question) {
  */
 function processSuggestedAction(authManager, messageId, action) {
   try {
-    const token = authManager.getToken();
+    validateAuthentication();
+
     const url = `${API_BASE_URL}/email/action`;
 
     const payload = {
@@ -1246,15 +1287,13 @@ function processSuggestedAction(authManager, messageId, action) {
       action: action,
     };
 
+    const payloadString = JSON.stringify(payload);
+    const headers = authManager.getAuthHeaders(payloadString);
+
     const response = UrlFetchApp.fetch(url, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'X-API-Key': API_KEY,
-        'X-Addon-Id': ADDON_ID,
-      },
-      payload: JSON.stringify(payload),
+      headers: headers,
+      payload: payloadString,
       muteHttpExceptions: true,
     });
 
@@ -1276,7 +1315,8 @@ function processSuggestedAction(authManager, messageId, action) {
  */
 function generateComposeEmailResponse(authManager, emailData, tone) {
   try {
-    const token = authManager.getToken();
+    validateAuthentication();
+
     const url = `${API_BASE_URL}/email/generate-response`;
 
     const payload = {
@@ -1287,15 +1327,13 @@ function generateComposeEmailResponse(authManager, emailData, tone) {
       tone: tone,
     };
 
+    const payloadString = JSON.stringify(payload);
+    const headers = authManager.getAuthHeaders(payloadString);
+
     const response = UrlFetchApp.fetch(url, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'X-API-Key': API_KEY,
-        'X-Addon-Id': ADDON_ID,
-      },
-      payload: JSON.stringify(payload),
+      headers: headers,
+      payload: payloadString,
       muteHttpExceptions: true,
     });
 
@@ -1317,17 +1355,14 @@ function generateComposeEmailResponse(authManager, emailData, tone) {
  */
 function fetchUserStats(authManager) {
   try {
-    const token = authManager.getToken();
+    validateAuthentication();
+
     const url = `${API_BASE_URL}/dashboard/stats`;
+    const headers = authManager.getAuthHeaders('');
 
     const response = UrlFetchApp.fetch(url, {
       method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'X-API-Key': API_KEY,
-        'X-Addon-Id': ADDON_ID,
-      },
+      headers: headers,
       muteHttpExceptions: true,
     });
 
@@ -1692,17 +1727,14 @@ function runQuickPrompt(e) {
  */
 function fetchFocusModeData(authManager) {
   try {
-    const token = authManager.getToken();
+    validateAuthentication();
+
     const url = `${API_BASE_URL}/dashboard/focus`;
+    const headers = authManager.getAuthHeaders('');
 
     const response = UrlFetchApp.fetch(url, {
       method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'X-API-Key': API_KEY,
-        'X-Addon-Id': ADDON_ID,
-      },
+      headers: headers,
       muteHttpExceptions: true,
     });
 

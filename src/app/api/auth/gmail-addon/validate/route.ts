@@ -32,14 +32,6 @@ export async function POST(request: NextRequest) {
         id: validationResult.user?.id,
         email: validationResult.user?.email,
         name: validationResult.user?.name,
-        subscription: validationResult.subscription
-          ? {
-              id: validationResult.subscription.id,
-              status: validationResult.subscription.status,
-              plan_id: validationResult.subscription.plan_id,
-              current_period_end: validationResult.subscription.current_period_end,
-            }
-          : undefined,
       },
       timestamp: GmailAddonAuth.generateTimestamp(),
     });
