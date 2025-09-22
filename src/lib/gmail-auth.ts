@@ -53,8 +53,8 @@ export class GmailAddonAuth {
         };
       }
 
-      // Initialize Supabase client
-      const supabase = await createClient();
+      // Initialize Supabase client (not needed for simplified auth)
+      // const supabase = await createClient();
 
       // For now, allow any Gmail user to access the add-on
       // This is a simplified approach for development purposes
@@ -88,11 +88,12 @@ export class GmailAddonAuth {
   }
 
   /**
-   * Validate Gmail email format
+   * Validate email format (basic validation for development)
    */
   private static isValidGmailEmail(email: string): boolean {
-    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
-    return gmailRegex.test(email);
+    // Basic email validation - accept any valid email format for development
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    return emailRegex.test(email);
   }
 
   /**

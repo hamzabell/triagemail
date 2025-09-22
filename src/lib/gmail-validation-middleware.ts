@@ -79,26 +79,21 @@ export function withGmailAddonValidation(handler: (request: NextRequest, context
 
 /**
  * Extract user information from validated request
+ * Simplified for MVP - no subscription checks
  */
 export function getGmailAddonUserInfo(request: NextRequest): {
   userId: string;
   userEmail: string;
-  subscriptionStatus: string;
-  subscriptionId: string;
 } | null {
   const userId = request.headers.get('X-User-ID');
   const userEmail = request.headers.get('X-User-Email');
-  const subscriptionStatus = request.headers.get('X-Subscription-Status');
-  const subscriptionId = request.headers.get('X-Subscription-ID');
 
-  if (!userId || !userEmail || !subscriptionStatus || !subscriptionId) {
+  if (!userId || !userEmail) {
     return null;
   }
 
   return {
     userId,
     userEmail,
-    subscriptionStatus,
-    subscriptionId,
   };
 }

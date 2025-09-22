@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { supabase } from '@/lib/db';
+import { withGmailAddonValidation, getGmailAddonUserInfo } from '@/lib/gmail-validation-middleware';
 
 interface FocusEmail {
   id: string;
@@ -40,11 +41,25 @@ interface FocusData {
   };
 }
 
-export async function GET(request: NextRequest) {
-  const user = await requireAuth();
+// Wrap the handler with Gmail add-on validation
+export const GET = withGmailAddonValidation(async (request: NextRequest) => {
+  // Get user info from validated request (either from Gmail add-on or regular auth)
+  const userInfo = getGmailAddonUserInfo(request);
 
-  if (user instanceof NextResponse) {
-    return user;
+  let user;
+  if (userInfo) {
+    // Gmail add-on authenticated user
+    user = {
+      id: userInfo.userId,
+      email: userInfo.userEmail,
+    };
+  } else {
+    // Regular authenticated user
+    const authUser = await requireAuth();
+    if (authUser instanceof NextResponse) {
+      return authUser;
+    }
+    user = authUser;
   }
 
   try {
@@ -161,4 +176,4 @@ export async function GET(request: NextRequest) {
     console.error('Focus mode error:', error);
     return NextResponse.json({ error: 'Failed to generate focus data' }, { status: 500 });
   }
-}
+});

@@ -1,26 +1,41 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { supabase } from '@/lib/db';
+import { withGmailAddonValidation, getGmailAddonUserInfo } from '@/lib/gmail-validation-middleware';
 
-export async function GET() {
-  const authUser = await requireAuth();
+// Wrap the handler with Gmail add-on validation
+export const GET = withGmailAddonValidation(async (request: NextRequest) => {
+  // Get user info from validated request (either from Gmail add-on or regular auth)
+  const userInfo = getGmailAddonUserInfo(request);
 
-  if (authUser instanceof NextResponse) {
-    return authUser;
+  let user;
+  if (userInfo) {
+    // Gmail add-on authenticated user
+    user = {
+      id: userInfo.userId,
+      email: userInfo.userEmail,
+    };
+  } else {
+    // Regular authenticated user
+    const authUser = await requireAuth();
+    if (authUser instanceof NextResponse) {
+      return authUser;
+    }
+    user = authUser;
   }
 
   try {
-    const { error: userError } = await supabase.from('users').select('*').eq('id', authUser.id).single();
+    const { error: userError } = await supabase.from('users').select('*').eq('id', user.id).single();
 
     if (userError) {
       const { error: createError } = await supabase
         .from('users')
         .insert([
           {
-            id: authUser.id,
-            email: authUser.email || '',
-            name: authUser.user_metadata?.name || '',
-            avatar: authUser.user_metadata?.avatar_url || '',
+            id: user.id,
+            email: user.email || '',
+            name: userInfo?.userEmail?.split('@')[0] || 'Gmail User',
+            avatar: '',
           },
         ])
         .select()
@@ -46,7 +61,7 @@ export async function GET() {
         )
       `,
       )
-      .eq('user_id', authUser.id)
+      .eq('user_id', user.id)
       .order('processed_at', { ascending: false })
       .limit(100);
 
@@ -60,7 +75,7 @@ export async function GET() {
     const { data: todayAnalytics, error: analyticsError } = await supabase
       .from('analytics')
       .select('*')
-      .eq('user_id', authUser.id)
+      .eq('user_id', user.id)
       .gte('date', today.toISOString())
       .single();
 
@@ -92,7 +107,7 @@ export async function GET() {
     const { data: monthlyAnalytics } = await supabase
       .from('analytics')
       .select('*')
-      .eq('user_id', authUser.id)
+      .eq('user_id', user.id)
       .gte('date', thisMonth.toISOString());
 
     const monthlyEmails = monthlyAnalytics?.reduce((sum, a) => sum + (a.emails_processed || 0), 0) || 0;
@@ -100,25 +115,28 @@ export async function GET() {
     const monthlyTimeSaved = monthlyAnalytics?.reduce((sum, a) => sum + (a.time_saved || 0), 0) || 0;
 
     return NextResponse.json({
-      emailsProcessed: totalEmails,
-      responsesGenerated: totalResponses,
-      timeSaved: Math.round((totalTimeSaved / 60) * 10) / 10,
-      accuracy: accuracyRate,
-      monthlyStats: {
-        emailsProcessed: monthlyEmails,
-        responsesGenerated: monthlyResponses,
-        timeSaved: Math.round((monthlyTimeSaved / 60) * 10) / 10,
+      success: true,
+      data: {
+        totalEmails,
+        responsesGenerated: totalResponses,
+        timeSaved: Math.round((totalTimeSaved / 60) * 10) / 10,
         accuracy: accuracyRate,
-      },
-      todayStats: todayAnalytics || {
-        emailsProcessed: 0,
-        responsesUsed: 0,
-        timeSaved: 0,
-        accuracy: 0,
+        monthlyStats: {
+          emailsProcessed: monthlyEmails,
+          responsesGenerated: monthlyResponses,
+          timeSaved: Math.round((monthlyTimeSaved / 60) * 10) / 10,
+          accuracy: accuracyRate,
+        },
+        todayStats: todayAnalytics || {
+          emailsProcessed: 0,
+          responsesUsed: 0,
+          timeSaved: 0,
+          accuracy: 0,
+        },
       },
     });
   } catch (error) {
     console.error('Dashboard stats error:', error);
     return NextResponse.json({ error: 'Failed to fetch dashboard statistics' }, { status: 500 });
   }
-}
+});

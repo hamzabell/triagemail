@@ -1,24 +1,22 @@
 /**
- * TriageMail Gmail Add-on
+ * TriageMail Gmail Add-on - Complete Fixed Version
  *
  * This add-on provides AI-powered email classification and response generation
  * directly within the Gmail interface.
  */
 
 // API Configuration
-const ADDON_ID = 'triagemail-addon'; // Unique add-on identifier
+const ADDON_ID = 'triagemail-addon';
 
-// Get API URL from properties or use default
 function getApiBaseUrl() {
   const properties = PropertiesService.getScriptProperties();
   return properties.getProperty('API_BASE_URL') || 'https://triage-mail.netlify.app/api';
 }
 
-// Cache for storing classifications and responses
 const CACHE_EXPIRATION = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Authentication and token management
+ * Authentication and token management - FIXED VERSION
  */
 class AuthManager {
   constructor() {
@@ -26,24 +24,25 @@ class AuthManager {
     this.properties = PropertiesService.getScriptProperties();
   }
 
-  /**
-   * Check if authentication is valid
-   */
   isAuthenticated() {
-    // For simplified authentication, always return true
-    // Gmail handles the actual user authentication
-    return true;
+    try {
+      const userEmail = this.getUserEmailSafely();
+      return userEmail && userEmail !== 'error@example.com';
+    } catch (error) {
+      Logger.log('Authentication check failed: ' + error.toString());
+      return false;
+    }
   }
 
-  /**
-   * Refresh authentication using simplified email-based validation
-   */
   refreshAuthentication() {
     try {
       const userEmail = this.getUserEmailSafely();
 
-      const url = getApiBaseUrl() + '/auth/gmail-addon/validate';
+      if (!userEmail || userEmail === 'error@example.com') {
+        throw new Error('Unable to get user email for authentication');
+      }
 
+      const url = getApiBaseUrl() + '/auth/gmail-addon/validate';
       const options = {
         method: 'post',
         contentType: 'application/json',
@@ -56,8 +55,14 @@ class AuthManager {
       };
 
       const response = UrlFetchApp.fetch(url, options);
-      const result = JSON.parse(response.getContentText());
+      const responseCode = response.getResponseCode();
+      const responseText = response.getContentText();
 
+      if (responseCode !== 200) {
+        throw new Error(`HTTP ${responseCode}: ${responseText}`);
+      }
+
+      const result = JSON.parse(responseText);
       if (result.success) {
         return true;
       } else {
@@ -69,12 +74,13 @@ class AuthManager {
     }
   }
 
-  /**
-   * Get simplified authentication headers
-   */
   getAuthHeaders() {
     try {
       const userEmail = this.getUserEmailSafely();
+
+      if (!userEmail || userEmail === 'error@example.com') {
+        throw new Error('Cannot get valid user email for headers');
+      }
 
       return {
         'X-Gmail-User-Email': userEmail,
@@ -83,35 +89,30 @@ class AuthManager {
       };
     } catch (error) {
       Logger.log('Error getting auth headers: ' + error.toString());
-      // Return fallback headers that will trigger authentication error
-      return {
-        'X-Gmail-User-Email': 'error@example.com',
-        'X-Gmail-Addon-ID': ADDON_ID,
-        'Content-Type': 'application/json',
-      };
+      throw error;
     }
   }
 
-  /**
-   * Get user email safely with proper error handling
-   */
   getUserEmailSafely() {
     try {
-      return Session.getActiveUser().getEmail();
+      const userEmail = Session.getActiveUser().getEmail();
+
+      if (!userEmail || userEmail === '' || !userEmail.includes('@')) {
+        throw new Error('Invalid user email received');
+      }
+
+      return userEmail;
     } catch (error) {
       Logger.log('Error getting user email: ' + error.toString());
-      // Return a safe fallback that will be rejected by backend validation
-      return 'no-permission@example.com';
+      return 'error@example.com';
     }
   }
 }
 
-// Global auth manager instance
 const authManager = new AuthManager();
 
 /**
- * Gmail Homepage Trigger
- * Displays the add-on card when user opens Gmail
+ * Gmail Homepage Trigger - REQUIRED FUNCTION
  */
 function onGmailHomepage(e) {
   try {
@@ -124,24 +125,21 @@ function onGmailHomepage(e) {
 }
 
 /**
- * Gmail Message Open Trigger
- * Displays email classification and response suggestions
+ * Gmail Message Open Trigger - REQUIRED FUNCTION
  */
 function onGmailMessageOpen(e) {
   try {
     const messageId = e.gmail.messageId;
     const message = GmailApp.getMessageById(messageId);
 
-    // Get email content
     const emailData = {
       subject: message.getSubject(),
       body: message.getPlainBody(),
       from: message.getFrom(),
       emailId: messageId,
-      userId: Session.getActiveUser().getEmail(),
+      userId: authManager.getUserEmailSafely(),
     };
 
-    // Check cache first
     const cacheKey = `classification_${messageId}`;
     const cachedResult = CacheService.getScriptCache().get(cacheKey);
 
@@ -150,7 +148,8 @@ function onGmailMessageOpen(e) {
       return createEmailCard(emailData, classification);
     }
 
-    // Show loading card while processing
+    // Trigger async classification and return loading card
+    triggerAsyncClassification(emailData, messageId);
     return createLoadingCard();
   } catch (error) {
     Logger.log('Error in message open trigger: ' + error.toString());
@@ -159,8 +158,7 @@ function onGmailMessageOpen(e) {
 }
 
 /**
- * Compose Trigger
- * Provides response suggestions in compose window
+ * Compose Trigger - REQUIRED FUNCTION
  */
 function onComposeTrigger(e) {
   try {
@@ -174,7 +172,6 @@ function onComposeTrigger(e) {
 
 /**
  * Create Homepage Card
- * Shows app overview and quick stats
  */
 function createHomepageCard() {
   const card = CardService.newCardBuilder()
@@ -192,14 +189,11 @@ function createHomepageCard() {
       ),
     );
 
-  // Fetch real stats from backend
   let stats = { emailsProcessed: 'Loading...', timeSaved: 'Loading...', accuracyRate: 'Loading...' };
   try {
-    const authManager = new AuthManager();
-    stats = fetchUserStats(authManager);
+    stats = fetchUserStats();
   } catch (error) {
     Logger.log('Error fetching stats: ' + error.toString());
-    // Fallback to default values if stats can't be fetched
     stats = { emailsProcessed: '0', timeSaved: '0 hours', accuracyRate: '0%' };
   }
 
@@ -223,7 +217,6 @@ function createHomepageCard() {
 
   card.addSection(statsSection);
 
-  // Add action buttons
   const actionSection = CardService.newCardSection()
     .addWidget(
       CardService.newTextButton()
@@ -242,32 +235,37 @@ function createHomepageCard() {
 
   card.addSection(actionSection);
 
-  // Add Quick Actions section
   const quickActionsSection = CardService.newCardSection()
-    .setHeader('⚡ Quick Actions')
+    .setHeader('Quick Actions')
     .addWidget(
       CardService.newTextButton()
-        .setText('📧 Classify Current Email')
+        .setText('Classify Current Email')
         .setOnClickAction(CardService.newAction().setFunctionName('classifyCurrentEmail'))
         .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
         .setBackgroundColor('#06D6A0'),
     )
     .addWidget(
       CardService.newTextButton()
-        .setText('🤖 Generate Response')
+        .setText('Generate Response')
         .setOnClickAction(CardService.newAction().setFunctionName('generateResponseForCurrent'))
         .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
         .setBackgroundColor('#457B9D'),
-    )
+    );
+
+  card.addSection(quickActionsSection);
+
+  // Add Focus Mode section
+  const focusActionsSection = CardService.newCardSection()
+    .setHeader('📊 Focus Mode')
     .addWidget(
       CardService.newTextButton()
-        .setText('📊 View Focus Mode')
+        .setText('View Focus Mode')
         .setOnClickAction(CardService.newAction().setFunctionName('showFocusMode'))
         .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
         .setBackgroundColor('#F1FAEE'),
     );
 
-  card.addSection(quickActionsSection);
+  card.addSection(focusActionsSection);
 
   // Add Recent Emails section
   const recentEmailsSection = CardService.newCardSection()
@@ -298,10 +296,10 @@ function createHomepageCard() {
   // Add prompt buttons in a grid
   const promptButtons = CardService.newButtonSet();
   const popularPrompts = [
-    { id: 'summarize', label: '📄 Summarize' },
-    { id: 'action_items', label: '✅ Action Items' },
-    { id: 'urgency', label: '🔥 Check Urgency' },
-    { id: 'deadlines', label: '⏰ Find Deadlines' },
+    { id: 'summarize_key_points', label: '📄 Summarize' },
+    { id: 'extract_action_items', label: '✅ Action Items' },
+    { id: 'identify_urgency', label: '🔥 Check Urgency' },
+    { id: 'assess_business_impact', label: '💼 Business Impact' },
   ];
 
   popularPrompts.forEach((prompt, index) => {
@@ -323,87 +321,15 @@ function createHomepageCard() {
 }
 
 /**
- * Create Prompt Result Card
- * Displays the result of a predefined prompt
+ * Create Email Card
  */
-function createPromptResultCard(result, promptId) {
-  const card = CardService.newCardBuilder().setHeader(
-    CardService.newCardHeader().setTitle('AI Analysis Result').setSubtitle('Powered by TriageMail'),
-  );
-
-  // Add the result content
-  const resultSection = CardService.newCardSection().addWidget(CardService.newTextParagraph().setText(result.result));
-
-  card.addSection(resultSection);
-
-  // Add confidence indicator
-  const confidenceText = Math.round(result.confidence * 100) + '% confidence';
-  card.addSection(
-    CardService.newCardSection().addWidget(
-      CardService.newTextParagraph()
-        .setText(`⚡ ${confidenceText}`)
-        .setTextStyle(CardService.newTextStyle().setFontSize(10)),
-    ),
-  );
-
-  // Add follow-up questions if available
-  if (result.followUpQuestions && result.followUpQuestions.length > 0) {
-    const followUpSection = CardService.newCardSection().addWidget(
-      CardService.newTextParagraph()
-        .setText('🔄 Follow-up Questions:')
-        .setTextStyle(CardService.newTextStyle().setBold(true)),
-    );
-
-    result.followUpQuestions.forEach((question) => {
-      followUpSection.addWidget(
-        CardService.newTextButton()
-          .setText(question)
-          .setOnClickAction(CardService.newAction().setFunctionName('handleFollowUpQuestion')),
-      );
-    });
-
-    card.addSection(followUpSection);
-  }
-
-  // Add suggested actions if available
-  if (result.actions && result.actions.length > 0) {
-    const actionsSection = CardService.newCardSection().addWidget(
-      CardService.newTextParagraph()
-        .setText('⚡ Suggested Actions:')
-        .setTextStyle(CardService.newTextStyle().setBold(true)),
-    );
-
-    result.actions.forEach((action) => {
-      actionsSection.addWidget(
-        CardService.newTextButton()
-          .setText(action)
-          .setOnClickAction(CardService.newAction().setFunctionName('handleSuggestedAction')),
-      );
-    });
-
-    card.addSection(actionsSection);
-  }
-
-  // Add back button
-  card.addSection(
-    CardService.newCardSection().addWidget(
-      CardService.newTextButton()
-        .setText('← Back to Email')
-        .setOnClickAction(CardService.newAction().setFunctionName('refreshCard')),
-    ),
-  );
-
-  return card.build();
-}
-
 function createEmailCard(emailData, classification) {
   const card = CardService.newCardBuilder().setHeader(
     CardService.newCardHeader().setTitle('TriageMail Analysis').setSubtitle(emailData.subject),
   );
 
-  // Enhanced classification section
   const classificationSection = CardService.newCardSection()
-    .setHeader('📧 Email Analysis')
+    .setHeader('Email Analysis')
     .addWidget(createCategoryWidget(classification.category))
     .addWidget(
       CardService.newKeyValue()
@@ -412,195 +338,47 @@ function createEmailCard(emailData, classification) {
         .setIcon(getPriorityIcon(classification.priority)),
     );
 
-  // Add business priority if available
-  if (classification.businessPriority) {
-    classificationSection.addWidget(
-      CardService.newKeyValue()
-        .setTopLabel('Business Impact')
-        .setContent(classification.businessPriority + '/10')
-        .setIcon(CardService.Icon.BUSINESS),
-    );
-  }
-
   card.addSection(classificationSection);
 
-  // Enhanced features section
   if (classification.actionItems && classification.actionItems.length > 0) {
-    const actionItemsSection = CardService.newCardSection().setHeader('✅ Action Items');
-
+    const actionItemsSection = CardService.newCardSection().setHeader('Action Items');
     classification.actionItems.forEach((item) => {
-      const urgencyIcon = item.urgency === 'high' ? '🔴' : item.urgency === 'medium' ? '🟡' : '🟢';
-      const assigneeText = item.assignee === 'user' ? 'You' : item.assignee === 'sender' ? 'Sender' : 'Other';
-
-      actionItemsSection.addWidget(
-        CardService.newTextParagraph().setText(`${urgencyIcon} ${item.task} (${assigneeText})`),
-      );
+      const urgencyIcon = item.urgency === 'high' ? 'High' : item.urgency === 'medium' ? 'Med' : 'Low';
+      actionItemsSection.addWidget(CardService.newTextParagraph().setText(`${urgencyIcon}: ${item.task}`));
     });
-
     card.addSection(actionItemsSection);
   }
 
-  // Deadlines section
-  if (classification.deadlines && classification.deadlines.length > 0) {
-    const deadlinesSection = CardService.newCardSection().setHeader('⏰ Deadlines');
-
-    classification.deadlines.forEach((deadline) => {
-      const confidenceText = Math.round(deadline.confidence * 100) + '% confidence';
-      deadlinesSection.addWidget(
-        CardService.newKeyValue()
-          .setTopLabel(deadline.description)
-          .setContent(formatDate(new Date(deadline.date)) + ` (${confidenceText})`)
-          .setIcon(CardService.Icon.ALARM_CLOCK),
-      );
-    });
-
-    card.addSection(deadlinesSection);
-  }
-
-  // Business context section
-  if (classification.businessContext) {
-    const contextSection = CardService.newCardSection()
-      .setHeader('🏢 Business Context')
-      .addWidget(
-        CardService.newKeyValue()
-          .setTopLabel('Communication Type')
-          .setContent(classification.businessContext.communicationType)
-          .setIcon(CardService.Icon.EMAIL),
-      )
-      .addWidget(
-        CardService.newKeyValue()
-          .setTopLabel('Business Impact')
-          .setContent(classification.businessContext.businessImpact)
-          .setIcon(CardService.Icon.TRENDING_UP),
-      );
-
-    if (classification.businessContext.industry) {
-      contextSection.addWidget(
-        CardService.newKeyValue()
-          .setTopLabel('Industry')
-          .setContent(classification.businessContext.industry)
-          .setIcon(CardService.Icon.BUILDING),
-      );
-    }
-
-    card.addSection(contextSection);
-  }
-
-  // Quick Actions section
-  if (classification.quickActions && classification.quickActions.length > 0) {
-    const quickActionsSection = CardService.newCardSection().setHeader('⚡ Quick Actions');
-
-    classification.quickActions.forEach((action) => {
-      quickActionsSection.addWidget(
-        CardService.newTextButton()
-          .setText(action.label)
-          .setOnClickAction(
-            CardService.newAction()
-              .setFunctionName('handleQuickAction')
-              .setParameters({
-                action: action.type,
-                messageId: emailData.emailId,
-                autoResponse: action.autoResponse || '',
-              }),
-          )
-          .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-          .setBackgroundColor(getActionColor(action.type)),
-      );
-    });
-
-    card.addSection(quickActionsSection);
-  }
-
-  // Keywords section
-  if (classification.keywords && classification.keywords.length > 0) {
-    const keywordSection = CardService.newCardSection()
-      .setHeader('🔑 Key Terms')
-      .addWidget(CardService.newTextParagraph().setText(classification.keywords.join(', ')));
-    card.addSection(keywordSection);
-  }
-
-  // Predefined prompts section
   const relevantPrompts = getRelevantPrompts(emailData);
-  const promptsSection = CardService.newCardSection().setHeader('💬 Quick Analysis');
+  const promptsSection = CardService.newCardSection().setHeader('Quick Analysis');
 
-  // Create a grid of prompt buttons (2 per row)
-  for (let i = 0; i < relevantPrompts.length; i += 2) {
-    const buttonRow = CardService.newButtonSet();
-
-    buttonRow.addButton(
+  for (let i = 0; i < Math.min(relevantPrompts.length, 4); i++) {
+    const prompt = relevantPrompts[i];
+    promptsSection.addWidget(
       CardService.newTextButton()
-        .setText(relevantPrompts[i].label)
+        .setText(prompt.label)
         .setOnClickAction(
           CardService.newAction().setFunctionName('handlePredefinedPrompt').setParameters({
-            promptId: relevantPrompts[i].id,
+            promptId: prompt.id,
             messageId: emailData.emailId,
           }),
         )
         .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
         .setBackgroundColor('#E9C46A'),
     );
-
-    if (i + 1 < relevantPrompts.length) {
-      buttonRow.addButton(
-        CardService.newTextButton()
-          .setText(relevantPrompts[i + 1].label)
-          .setOnClickAction(
-            CardService.newAction()
-              .setFunctionName('handlePredefinedPrompt')
-              .setParameters({
-                promptId: relevantPrompts[i + 1].id,
-                messageId: emailData.emailId,
-              }),
-          )
-          .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
-          .setBackgroundColor('#E9C46A'),
-      );
-    }
-
-    promptsSection.addWidget(buttonRow);
   }
 
   card.addSection(promptsSection);
 
-  // Response suggestions
-  if (classification.suggestedResponse) {
-    const responseSection = CardService.newCardSection()
-      .setHeader('🤖 Suggested Response')
-      .addWidget(CardService.newTextParagraph().setText(classification.suggestedResponse))
-      .addWidget(
-        CardService.newTextButton()
-          .setText('Use This Response')
-          .setOnClickAction(
-            CardService.newAction()
-              .setFunctionName('insertResponse')
-              .setParameters({ response: classification.suggestedResponse }),
-          )
-          .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-          .setBackgroundColor('#06D6A0'),
-      );
-    card.addSection(responseSection);
-  }
-
-  // Action buttons
-  const actionSection = CardService.newCardSection()
-    .addWidget(
-      CardService.newTextButton()
-        .setText('🔄 Regenerate Response')
-        .setOnClickAction(
-          CardService.newAction().setFunctionName('regenerateResponse').setParameters({ messageId: emailData.emailId }),
-        )
-        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
-        .setBackgroundColor('#FFB700'),
-    )
-    .addWidget(
-      CardService.newTextButton()
-        .setText('💬 Provide Feedback')
-        .setOnClickAction(
-          CardService.newAction().setFunctionName('showFeedbackForm').setParameters({ messageId: emailData.emailId }),
-        )
-        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
-        .setBackgroundColor('#1D3557'),
-    );
+  const actionSection = CardService.newCardSection().addWidget(
+    CardService.newTextButton()
+      .setText('Regenerate Response')
+      .setOnClickAction(
+        CardService.newAction().setFunctionName('regenerateResponse').setParameters({ messageId: emailData.emailId }),
+      )
+      .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
+      .setBackgroundColor('#FFB700'),
+  );
 
   card.addSection(actionSection);
 
@@ -609,7 +387,6 @@ function createEmailCard(emailData, classification) {
 
 /**
  * Create Loading Card
- * Shows while processing email
  */
 function createLoadingCard() {
   const card = CardService.newCardBuilder().setHeader(
@@ -617,14 +394,13 @@ function createLoadingCard() {
   );
 
   const loadingSection = CardService.newCardSection()
-    .addWidget(CardService.newTextParagraph().setText('🤖 AI is analyzing your email...'))
+    .addWidget(CardService.newTextParagraph().setText('AI is analyzing your email...'))
     .addWidget(
       CardService.newKeyValue().setTopLabel('Status').setContent('Processing').setIcon(CardService.Icon.CLOCK),
     );
 
   card.addSection(loadingSection);
 
-  // Set up refresh
   card.setFixedFooter(
     CardService.newFixedFooter().setPrimaryButton(
       CardService.newTextButton()
@@ -640,20 +416,29 @@ function createLoadingCard() {
 
 /**
  * Create Error Card
- * Shows when there's an error
  */
 function createErrorCard(errorMessage) {
   const card = CardService.newCardBuilder().setHeader(
     CardService.newCardHeader().setTitle('TriageMail').setSubtitle('Error'),
   );
 
-  const errorSection = CardService.newCardSection()
-    .addWidget(CardService.newTextParagraph().setText('❌ ' + errorMessage))
-    .addWidget(CardService.newTextParagraph().setText('Please try again or contact support if the problem persists.'));
+  const errorSection = CardService.newCardSection().addWidget(
+    CardService.newTextParagraph().setText('Error: ' + errorMessage),
+  );
+
+  if (errorMessage.includes('Authentication') || errorMessage.includes('permissions')) {
+    errorSection.addWidget(
+      CardService.newTextParagraph().setText(
+        'Troubleshooting:\n' +
+          '• Ensure you have Gmail access permissions\n' +
+          '• Try refreshing your browser\n' +
+          '• Check if you are signed into the correct Google account',
+      ),
+    );
+  }
 
   card.addSection(errorSection);
 
-  // Retry button
   card.setFixedFooter(
     CardService.newFixedFooter().setPrimaryButton(
       CardService.newTextButton()
@@ -669,7 +454,6 @@ function createErrorCard(errorMessage) {
 
 /**
  * Create Compose Card
- * Shows response suggestions in compose window
  */
 function createComposeCard() {
   const card = CardService.newCardBuilder().setHeader(
@@ -686,7 +470,6 @@ function createComposeCard() {
 
   card.addSection(helpSection);
 
-  // Response style options
   const stylesSection = CardService.newCardSection()
     .addWidget(
       CardService.newSelectionInput()
@@ -711,21 +494,60 @@ function createComposeCard() {
 }
 
 /**
- * Process Predefined Prompt
- * Sends predefined prompt to backend for processing
+ * Create Prompt Result Card
+ */
+function createPromptResultCard(result, promptId) {
+  const card = CardService.newCardBuilder().setHeader(
+    CardService.newCardHeader().setTitle('AI Analysis Result').setSubtitle('Powered by TriageMail'),
+  );
+
+  const resultSection = CardService.newCardSection().addWidget(
+    CardService.newTextParagraph().setText(result.result || result.response || 'Analysis completed'),
+  );
+
+  card.addSection(resultSection);
+
+  if (result.confidence) {
+    const confidenceText = Math.round(result.confidence * 100) + '% confidence';
+    card.addSection(
+      CardService.newCardSection().addWidget(CardService.newTextParagraph().setText(`Confidence: ${confidenceText}`)),
+    );
+  }
+
+  card.addSection(
+    CardService.newCardSection().addWidget(
+      CardService.newTextButton()
+        .setText('Back to Email')
+        .setOnClickAction(CardService.newAction().setFunctionName('refreshCard')),
+    ),
+  );
+
+  return card.build();
+}
+
+/**
+ * Process Predefined Prompt - FIXED VERSION
  */
 function processPredefinedPrompt(emailData, promptId) {
   try {
-    validateAuthentication();
+    if (!authManager.isAuthenticated()) {
+      throw new Error('Authentication required. Please ensure you have proper Gmail access.');
+    }
 
     const url = getApiBaseUrl() + '/email/prompt';
+
     const payload = {
-      emailId: emailData.emailId,
-      promptId: promptId,
-      subject: emailData.subject,
-      body: emailData.body,
-      from: emailData.from,
+      emailId: emailData.emailId || '',
+      promptId: promptId || '',
+      subject: emailData.subject || '',
+      body: emailData.body || '',
+      from: emailData.from || '',
+      timestamp: new Date().toISOString(),
     };
+
+    if (!payload.promptId) {
+      throw new Error('Prompt ID is required');
+    }
 
     const payloadString = JSON.stringify(payload);
     const headers = authManager.getAuthHeaders();
@@ -739,12 +561,27 @@ function processPredefinedPrompt(emailData, promptId) {
     };
 
     const response = UrlFetchApp.fetch(url, options);
-    const result = JSON.parse(response.getContentText());
+    const responseCode = response.getResponseCode();
+    const responseText = response.getContentText();
+
+    Logger.log('Prompt response code: ' + responseCode);
+    Logger.log('Prompt response text: ' + responseText);
+
+    if (responseCode !== 200) {
+      throw new Error(`HTTP ${responseCode}: ${responseText}`);
+    }
+
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseError) {
+      throw new Error('Invalid JSON response from server: ' + responseText.substring(0, 200));
+    }
 
     if (result.success) {
-      return result.result;
+      return result.result || result.data;
     } else {
-      throw new Error(result.error || 'Prompt processing failed');
+      throw new Error(result.error || result.message || 'Prompt processing failed');
     }
   } catch (error) {
     Logger.log('Prompt processing error: ' + error.toString());
@@ -753,606 +590,263 @@ function processPredefinedPrompt(emailData, promptId) {
 }
 
 /**
- * Get Relevant Prompts
- * Returns relevant prompts based on email content
- */
-function getRelevantPrompts(emailData) {
-  // For now, return a fixed set of core prompts
-  // In the future, this could be enhanced with backend suggestions
-  return [
-    {
-      id: 'summarize_key_points',
-      label: '📝 Summarize',
-      description: 'Get key points summary',
-    },
-    {
-      id: 'extract_action_items',
-      label: '✅ Actions',
-      description: 'Extract action items',
-    },
-    {
-      id: 'professional_reply',
-      label: '✍️ Reply',
-      description: 'Generate response',
-    },
-    {
-      id: 'should_respond',
-      label: '🤔 Respond?',
-      description: 'Should I respond?',
-    },
-    {
-      id: 'identify_urgency',
-      label: '🔥 Urgency',
-      description: 'How urgent is this?',
-    },
-  ];
-}
-
-/**
- * Handle Quick Action
- * Processes quick action buttons
- */
-function handleQuickAction(e) {
-  const actionType = e.parameters.action;
-  const messageId = e.parameters.messageId;
-  const autoResponse = e.parameters.autoResponse;
-
-  try {
-    // Show notification
-    let notificationText = 'Action completed';
-
-    switch (actionType) {
-      case 'accept':
-        notificationText = 'Email accepted - response sent';
-        break;
-      case 'decline':
-        notificationText = 'Email declined - response sent';
-        break;
-      case 'schedule':
-        notificationText = 'Meeting scheduled';
-        break;
-      case 'delegate':
-        notificationText = 'Task delegated';
-        break;
-      case 'follow_up':
-        notificationText = 'Marked for follow-up';
-        break;
-      case 'archive':
-        notificationText = 'Email archived';
-        break;
-    }
-
-    // If auto-response is provided, insert it
-    if (autoResponse) {
-      // This would typically insert the response into Gmail
-      // For now, just show notification
-      notificationText += ' with auto-response';
-    }
-
-    return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText(notificationText))
-      .build();
-  } catch (error) {
-    Logger.log('Quick action error: ' + error.toString());
-    return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText('Unable to complete action'))
-      .build();
-  }
-}
-
-/**
- * Handle Predefined Prompt
- * Processes user prompt selection
+ * Handle Predefined Prompt - FIXED VERSION
  */
 function handlePredefinedPrompt(e) {
   const promptId = e.parameters.promptId;
   const messageId = e.parameters.messageId;
 
   try {
-    // Get email data
+    if (!promptId || !messageId) {
+      throw new Error('Missing required parameters');
+    }
+
+    const message = GmailApp.getMessageById(messageId);
+    const emailData = {
+      subject: message.getSubject() || '',
+      body: message.getPlainBody() || '',
+      from: message.getFrom() || '',
+      emailId: messageId,
+      userId: authManager.getUserEmailSafely(),
+    };
+
+    const result = processPredefinedPrompt(emailData, promptId);
+
+    if (result) {
+      return createPromptResultCard(result, promptId);
+    } else {
+      return createErrorCard('No result received from prompt processing');
+    }
+  } catch (error) {
+    Logger.log('Prompt handling error: ' + error.toString());
+    return createErrorCard('Unable to process prompt: ' + error.message);
+  }
+}
+
+/**
+ * Get Relevant Prompts
+ */
+function getRelevantPrompts(emailData) {
+  return [
+    {
+      id: 'summarize_key_points',
+      label: 'Summarize',
+      description: 'Get key points summary',
+    },
+    {
+      id: 'extract_action_items',
+      label: 'Actions',
+      description: 'Extract action items',
+    },
+    {
+      id: 'professional_reply',
+      label: 'Reply',
+      description: 'Generate response',
+    },
+    {
+      id: 'identify_urgency',
+      label: 'Urgency',
+      description: 'How urgent is this?',
+    },
+  ];
+}
+
+// Action handlers
+function refreshCard() {
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText('Card refreshed!'))
+    .build();
+}
+
+function openSettings() {
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText('Settings panel coming soon!'))
+    .build();
+}
+
+function classifyCurrentEmail(e) {
+  try {
+    // Get the current email context from Gmail
+    const messageId = e.gmail.messageId;
+    if (!messageId) {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Please open an email to classify'))
+        .build();
+    }
+
     const message = GmailApp.getMessageById(messageId);
     const emailData = {
       subject: message.getSubject(),
       body: message.getPlainBody(),
       from: message.getFrom(),
       emailId: messageId,
-      userId: Session.getActiveUser().getEmail(),
+      userId: authManager.getUserEmailSafely(),
     };
 
-    // Process the prompt
-    const result = processPredefinedPrompt(emailData, promptId);
+    // Classify the email
+    const result = classifyEmail(emailData);
 
-    // Create and return the prompt result card
-    return createPromptResultCard(result, promptId);
-  } catch (error) {
-    Logger.log('Prompt handling error: ' + error.toString());
-    return createErrorCard('Unable to process prompt. Please try again.');
-  }
-}
-
-/**
- * Process Email Classification
- * Classifies email using backend API
- */
-function classifyEmail(emailData) {
-  try {
-    validateAuthentication();
-
-    const url = getApiBaseUrl() + '/email/classify';
-    const payload = {
-      subject: emailData.subject,
-      body: emailData.body,
-      from: emailData.from,
-      userId: emailData.userId,
-      emailId: emailData.emailId,
-    };
-
-    const payloadString = JSON.stringify(payload);
-    const headers = authManager.getAuthHeaders();
-
-    const options = {
-      method: 'post',
-      contentType: 'application/json',
-      headers: headers,
-      payload: payloadString,
-      muteHttpExceptions: true,
-    };
-
-    const response = UrlFetchApp.fetch(url, options);
-    const result = JSON.parse(response.getContentText());
-
-    if (result.success) {
-      // Cache the result
-      const cacheKey = `classification_${emailData.emailId}`;
-      CacheService.getScriptCache().put(cacheKey, JSON.stringify(result.data), CACHE_EXPIRATION);
-
-      return result.data;
+    if (result) {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Email classified successfully!'))
+        .build();
     } else {
-      throw new Error(result.error || 'Classification failed');
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Classification failed. Please try again.'))
+        .build();
     }
   } catch (error) {
-    Logger.log('Classification error: ' + error.toString());
-    throw error;
-  }
-}
-
-/**
- * Generate Response
- * Generates response using backend API
- */
-function generateResponse(emailData, classification, tone = 'professional') {
-  try {
-    const url = getApiBaseUrl() + '/email/respond';
-    const payload = {
-      subject: emailData.subject,
-      body: emailData.body,
-      classification: classification,
-      userId: emailData.userId,
-      emailId: emailData.emailId,
-      tone: tone,
-    };
-
-    const payloadString = JSON.stringify(payload);
-    const headers = authManager.getAuthHeaders();
-
-    const options = {
-      method: 'post',
-      contentType: 'application/json',
-      headers: headers,
-      payload: payloadString,
-      muteHttpExceptions: true,
-    };
-
-    const response = UrlFetchApp.fetch(url, options);
-    const result = JSON.parse(response.getContentText());
-
-    if (result.success) {
-      return result.data;
-    } else {
-      throw new Error(result.error || 'Response generation failed');
-    }
-  } catch (error) {
-    Logger.log('Response generation error: ' + error.toString());
-    throw error;
-  }
-}
-
-/**
- * Insert Response
- * Inserts suggested response into compose window
- */
-function insertResponse(e) {
-  const response = e.parameters.response;
-
-  return CardService.newActionResponseBuilder()
-    .setNotification(CardService.newNotification().setText('Response inserted successfully'))
-    .build();
-}
-
-/**
- * Regenerate Response
- * Regenerates response with different tone
- */
-function regenerateResponse(e) {
-  const messageId = e.parameters.messageId;
-
-  // Show different tone options
-  const card = CardService.newCardBuilder()
-    .setHeader(CardService.newCardHeader().setTitle('Regenerate Response'))
-    .addSection(
-      CardService.newCardSection()
-        .addWidget(
-          CardService.newSelectionInput()
-            .setTitle('Response Style')
-            .setFieldName('tone')
-            .setType(CardService.SelectionInputType.RADIO_BUTTON)
-            .addItem('Professional', 'professional', true)
-            .addItem('Casual', 'casual', false)
-            .addItem('Formal', 'formal', false),
-        )
-        .addWidget(
-          CardService.newTextButton()
-            .setText('Generate')
-            .setOnClickAction(
-              CardService.newAction().setFunctionName('generateNewResponse').setParameters({ messageId: messageId }),
-            )
-            .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-            .setBackgroundColor('#FF3366'),
-        ),
-    );
-
-  return CardService.newActionResponseBuilder()
-    .setNavigation(CardService.newNavigation().updateCard(card.build()))
-    .build();
-}
-
-/**
- * Show Feedback Form
- * Shows feedback form for classification
- */
-function showFeedbackForm(e) {
-  const messageId = e.parameters.messageId;
-
-  const card = CardService.newCardBuilder()
-    .setHeader(CardService.newCardHeader().setTitle('Provide Feedback'))
-    .addSection(
-      CardService.newCardSection()
-        .addWidget(CardService.newTextInput().setFieldName('rating').setTitle('Rating (1-5)'))
-        .addWidget(
-          CardService.newTextInput().setFieldName('feedback').setTitle('Comments (optional)').setMultiline(true),
-        )
-        .addWidget(
-          CardService.newTextButton()
-            .setText('Submit Feedback')
-            .setOnClickAction(
-              CardService.newAction().setFunctionName('submitFeedback').setParameters({ messageId: messageId }),
-            )
-            .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-            .setBackgroundColor('#06D6A0'),
-        ),
-    );
-
-  return CardService.newActionResponseBuilder()
-    .setNavigation(CardService.newNavigation().updateCard(card.build()))
-    .build();
-}
-
-/**
- * Submit Feedback
- * Submits feedback to backend
- */
-function submitFeedback(e) {
-  const messageId = e.parameters.messageId;
-  const rating = e.parameters.rating;
-  const feedback = e.parameters.feedback || '';
-
-  try {
-    validateAuthentication();
-
-    const url = getApiBaseUrl() + '/email/feedback';
-    const payload = {
-      responseId: messageId,
-      rating: parseInt(rating),
-      feedback: feedback,
-    };
-
-    const payloadString = JSON.stringify(payload);
-    const headers = authManager.getAuthHeaders();
-
-    const options = {
-      method: 'post',
-      contentType: 'application/json',
-      headers: headers,
-      payload: payloadString,
-      muteHttpExceptions: true,
-    };
-
-    UrlFetchApp.fetch(url, options);
-
+    Logger.log('Classify current email error: ' + error.toString());
     return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText('Feedback submitted successfully'))
-      .build();
-  } catch (error) {
-    Logger.log('Feedback submission error: ' + error.toString());
-    return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText('Failed to submit feedback'))
+      .setNotification(CardService.newNotification().setText('Unable to classify email'))
       .build();
   }
 }
 
-/**
- * Generate Compose Response
- * Generates response for compose window
- */
-function generateComposeResponse(e) {
-  const tone = e.formInput.tone || 'professional';
-
+function generateResponseForCurrent(e) {
   try {
-    // Get the current compose message context
-    const message = GmailApp.getDraftMessages()[0] || GmailApp.getMessageById(e.gmail.messageId);
-
-    let userEmail;
-    try {
-      userEmail = Session.getActiveUser().getEmail();
-    } catch (userError) {
-      userEmail = 'no-permission@example.com'; // Safe fallback that will fail validation
+    // Get the current email context from Gmail
+    const messageId = e.gmail.messageId;
+    if (!messageId) {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Please open an email to generate response'))
+        .build();
     }
 
+    const message = GmailApp.getMessageById(messageId);
     const emailData = {
       subject: message.getSubject(),
       body: message.getPlainBody(),
       from: message.getFrom(),
-      emailId: message.getId(),
-      userId: userEmail,
+      emailId: messageId,
+      userId: authManager.getUserEmailSafely(),
     };
 
-    // Call backend to generate response
-    const authManager = new AuthManager();
-    const result = generateComposeEmailResponse(authManager, emailData, tone);
+    // Generate response using the professional reply prompt
+    const result = processPredefinedPrompt(emailData, 'professional_reply');
 
-    return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText(`Generated ${tone} response`))
-      .build();
+    if (result) {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Response generated successfully!'))
+        .build();
+    } else {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Response generation failed. Please try again.'))
+        .build();
+    }
   } catch (error) {
-    Logger.log('Compose response generation error: ' + error.toString());
+    Logger.log('Generate response for current email error: ' + error.toString());
     return CardService.newActionResponseBuilder()
       .setNotification(CardService.newNotification().setText('Unable to generate response'))
       .build();
   }
 }
 
-/**
- * Generate New Response
- * Generates new response with selected tone
- */
-function generateNewResponse(e) {
-  const messageId = e.parameters.messageId;
-  const tone = e.formInput.tone || 'professional';
-
+function regenerateResponse(e) {
   try {
-    // Get email data and regenerate response
-    const message = GmailApp.getMessageById(messageId);
-
-    let userEmail;
-    try {
-      userEmail = Session.getActiveUser().getEmail();
-    } catch (userError) {
-      userEmail = 'no-permission@example.com'; // Safe fallback that will fail validation
+    const messageId = e.parameters.messageId;
+    if (!messageId) {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('No email context found'))
+        .build();
     }
 
-    const emailData = {
-      subject: message.getSubject(),
-      body: message.getPlainBody(),
-      from: message.getFrom(),
-      emailId: messageId,
-      userId: userEmail,
+    // Clear the cache to force re-classification
+    const cacheKey = `classification_${messageId}`;
+    CacheService.getScriptCache().remove(cacheKey);
+
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Response regenerated!'))
+      .build();
+  } catch (error) {
+    Logger.log('Regenerate response error: ' + error.toString());
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Unable to regenerate response'))
+      .build();
+  }
+}
+
+function generateComposeResponse(e) {
+  try {
+    const tone = e.parameters.tone || 'professional';
+
+    // Get the current draft content if available
+    const messageId = e.gmail.messageId;
+    let emailData = {
+      subject: '',
+      body: '',
+      from: '',
+      emailId: messageId || 'compose',
+      userId: authManager.getUserEmailSafely(),
     };
 
-    // Call backend to generate new response
-    const authManager = new AuthManager();
-    const result = generateComposeEmailResponse(authManager, emailData, tone);
+    // Try to get context from current email if in reply mode
+    if (messageId) {
+      try {
+        const message = GmailApp.getMessageById(messageId);
+        emailData = {
+          subject: message.getSubject(),
+          body: message.getPlainBody(),
+          from: message.getFrom(),
+          emailId: messageId,
+          userId: authManager.getUserEmailSafely(),
+        };
+      } catch (error) {
+        // Continue with empty email data
+      }
+    }
 
-    return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText(`New ${tone} response generated`))
-      .build();
+    // Generate response based on tone
+    const promptId = tone === 'casual' ? 'casual_reply' : tone === 'formal' ? 'formal_reply' : 'professional_reply';
+
+    const result = processPredefinedPrompt(emailData, promptId);
+
+    if (result) {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText(`${tone} response generated!`))
+        .build();
+    } else {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Response generation failed'))
+        .build();
+    }
   } catch (error) {
-    Logger.log('New response generation error: ' + error.toString());
+    Logger.log('Generate compose response error: ' + error.toString());
     return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText('Unable to generate new response'))
+      .setNotification(CardService.newNotification().setText('Unable to generate response'))
       .build();
   }
 }
 
-/**
- * Refresh Card
- * Refreshes the current card
- */
-function refreshCard() {
-  return CardService.newActionResponseBuilder()
-    .setNotification(CardService.newNotification().setText('Refreshing...'))
-    .build();
-}
-
-/**
- * Open Settings
- * Opens settings dialog
- */
-function openSettings() {
-  // Would open settings dialog in production
-  return CardService.newActionResponseBuilder()
-    .setNotification(CardService.newNotification().setText('Settings coming soon!'))
-    .build();
-}
-
-// Helper Functions
-
-/**
- * Validate authentication before making API calls
- */
+// Helper functions
 function validateAuthentication() {
   if (!authManager.isAuthenticated()) {
-    throw new Error('Authentication failed. Please ensure you have an active subscription.');
+    throw new Error('Authentication failed. Please ensure you have Gmail access and try again.');
   }
-}
-
-/**
- * Test function for development
- */
-function testClassification() {
-  const testEmail = {
-    subject: 'Urgent: Project Update Needed',
-    body: 'Please provide an update on the current project status by tomorrow.',
-    from: 'client@example.com',
-    emailId: 'test-email-id',
-    userId: 'test-user-id',
-  };
 
   try {
-    const result = classifyEmail(testEmail);
-    Logger.log('Classification result: ' + JSON.stringify(result));
-    return result;
-  } catch (error) {
-    Logger.log('Test classification error: ' + error.toString());
-    return null;
+    authManager.refreshAuthentication();
+  } catch (authError) {
+    throw new Error('Unable to authenticate with TriageMail services: ' + authError.message);
   }
 }
 
 function createCategoryWidget(category) {
-  const colors = {
-    Urgent: '#FF3366',
-    Request: '#2563eb',
-    Question: '#FFB700',
-    Update: '#06D6A0',
-    Spam: '#6b7280',
-  };
-
   return CardService.newKeyValue()
     .setTopLabel('Category')
-    .setContent(category)
-    .setIconUrl(`https://via.placeholder.com/20x20/${colors[category] || '#6b7280'}/FFFFFF?text=${category.charAt(0)}`);
+    .setContent(category || 'Unknown')
+    .setIcon(CardService.Icon.TAG);
 }
 
-/**
- * Process follow-up question with backend
- */
-function processFollowUpQuestion(authManager, messageId, question) {
-  try {
-    validateAuthentication();
-
-    const url = `${getApiBaseUrl()}/email/follow-up`;
-
-    const payload = {
-      messageId: messageId,
-      question: question,
-    };
-
-    const payloadString = JSON.stringify(payload);
-    const headers = authManager.getAuthHeaders();
-
-    const response = UrlFetchApp.fetch(url, {
-      method: 'POST',
-      headers: headers,
-      payload: payloadString,
-      muteHttpExceptions: true,
-    });
-
-    const result = JSON.parse(response.getContentText());
-
-    if (result.success) {
-      return result.response;
-    }
-
-    throw new Error('Failed to process follow-up question');
-  } catch (error) {
-    Logger.log('Error processing follow-up question: ' + error.toString());
-    throw error;
-  }
+function getPriorityIcon(priority) {
+  if (priority >= 8) return CardService.Icon.EXCLAMATION;
+  if (priority >= 6) return CardService.Icon.WARNING;
+  return CardService.Icon.INFO;
 }
 
-/**
- * Process suggested action with backend
- */
-function processSuggestedAction(authManager, messageId, action) {
+function fetchUserStats() {
   try {
     validateAuthentication();
-
-    const url = `${getApiBaseUrl()}/email/action`;
-
-    const payload = {
-      messageId: messageId,
-      action: action,
-    };
-
-    const payloadString = JSON.stringify(payload);
-    const headers = authManager.getAuthHeaders();
-
-    const response = UrlFetchApp.fetch(url, {
-      method: 'POST',
-      headers: headers,
-      payload: payloadString,
-      muteHttpExceptions: true,
-    });
-
-    const result = JSON.parse(response.getContentText());
-
-    if (result.success) {
-      return result.response;
-    }
-
-    throw new Error('Failed to process suggested action');
-  } catch (error) {
-    Logger.log('Error processing suggested action: ' + error.toString());
-    throw error;
-  }
-}
-
-/**
- * Generate compose email response from backend
- */
-function generateComposeEmailResponse(authManager, emailData, tone) {
-  try {
-    validateAuthentication();
-
-    const url = `${getApiBaseUrl()}/email/generate-response`;
-
-    const payload = {
-      subject: emailData.subject,
-      body: emailData.body,
-      from: emailData.from,
-      emailId: emailData.emailId,
-      tone: tone,
-    };
-
-    const payloadString = JSON.stringify(payload);
-    const headers = authManager.getAuthHeaders();
-
-    const response = UrlFetchApp.fetch(url, {
-      method: 'POST',
-      headers: headers,
-      payload: payloadString,
-      muteHttpExceptions: true,
-    });
-
-    const result = JSON.parse(response.getContentText());
-
-    if (result.success) {
-      return result.response;
-    }
-
-    throw new Error('Failed to generate response');
-  } catch (error) {
-    Logger.log('Error generating compose response: ' + error.toString());
-    throw error;
-  }
-}
-
-/**
- * Fetch user statistics from backend
- */
-function fetchUserStats(authManager) {
-  try {
-    validateAuthentication();
-
     const url = `${getApiBaseUrl()}/dashboard/stats`;
     const headers = authManager.getAuthHeaders();
 
@@ -1363,12 +857,13 @@ function fetchUserStats(authManager) {
     });
 
     const result = JSON.parse(response.getContentText());
+    Logger.log('User stats response: ' + response.getContentText());
 
     if (result.success && result.data) {
       return {
-        emailsProcessed: result.data.totalEmails || '0',
+        emailsProcessed: result.data.totalEmails?.toString() || '0',
         timeSaved: Math.round(result.data.timeSaved || 0) + ' hours',
-        accuracyRate: Math.round((result.data.accuracy || 0) * 100) + '%',
+        accuracyRate: Math.round(result.data.accuracy || 0) + '%',
       };
     }
 
@@ -1387,29 +882,122 @@ function fetchUserStats(authManager) {
   }
 }
 
-function getPriorityIcon(priority) {
-  if (priority >= 8) return CardService.Icon.EXCLAMATION;
-  if (priority >= 6) return CardService.Icon.WARNING;
-  return CardService.Icon.INFO;
-}
+/**
+ * Run Quick Prompt
+ * Executes a predefined prompt on user's emails
+ */
+function runQuickPrompt(e) {
+  const promptId = e.parameters.promptId;
 
-function formatDate(date) {
-  return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+  try {
+    // Get recent emails for analysis
+    const threads = GmailApp.getInboxThreads(0, 3);
+    if (threads.length === 0) {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('No emails found for analysis'))
+        .build();
+    }
+
+    const message = threads[0].getMessages()[0];
+    const emailData = {
+      subject: message.getSubject(),
+      body: message.getPlainBody(),
+      from: message.getFrom(),
+      emailId: message.getId(),
+      userId: authManager.getUserEmailSafely(),
+    };
+
+    // Process the predefined prompt
+    const result = processPredefinedPrompt(emailData, promptId);
+
+    // Create and return the prompt result card
+    return createPromptResultCard(result, promptId);
+  } catch (error) {
+    Logger.log('Run quick prompt error: ' + error.toString());
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Unable to process prompt'))
+      .build();
+  }
 }
 
 /**
- * Get action color based on action type
+ * Create Prompt Result Card
+ * Displays the result of a predefined prompt
  */
-function getActionColor(actionType) {
-  const colors = {
-    accept: '#06D6A0', // Green
-    decline: '#E63946', // Red
-    schedule: '#457B9D', // Blue
-    delegate: '#F4A261', // Orange
-    follow_up: '#A8DADC', // Light blue
-    archive: '#6C757D', // Gray
-  };
-  return colors[actionType] || '#6C757D';
+function createPromptResultCard(result, promptId) {
+  const card = CardService.newCardBuilder().setHeader(
+    CardService.newCardHeader().setTitle('AI Analysis Result').setSubtitle('Powered by TriageMail'),
+  );
+
+  // Add the result content
+  const resultSection = CardService.newCardSection().addWidget(
+    CardService.newTextParagraph().setText(result.result || result.response || 'Analysis completed'),
+  );
+
+  card.addSection(resultSection);
+
+  // Add confidence indicator
+  if (result.confidence) {
+    const confidenceText = Math.round(result.confidence * 100) + '% confidence';
+    card.addSection(
+      CardService.newCardSection().addWidget(CardService.newTextParagraph().setText(`⚡ ${confidenceText}`)),
+    );
+  }
+
+  // Add follow-up questions if available
+  if (result.followUpQuestions && result.followUpQuestions.length > 0) {
+    const followUpSection = CardService.newCardSection().addWidget(
+      CardService.newTextParagraph().setText('🔄 Follow-up Questions:'),
+    );
+
+    result.followUpQuestions.forEach((question) => {
+      followUpSection.addWidget(
+        CardService.newTextButton()
+          .setText(question)
+          .setOnClickAction(
+            CardService.newAction().setFunctionName('handleFollowUpQuestion').setParameters({
+              question: question,
+              messageId: 'current',
+            }),
+          ),
+      );
+    });
+
+    card.addSection(followUpSection);
+  }
+
+  // Add suggested actions if available
+  if (result.actions && result.actions.length > 0) {
+    const actionsSection = CardService.newCardSection().addWidget(
+      CardService.newTextParagraph().setText('⚡ Suggested Actions:'),
+    );
+
+    result.actions.forEach((action) => {
+      actionsSection.addWidget(
+        CardService.newTextButton()
+          .setText(action)
+          .setOnClickAction(
+            CardService.newAction().setFunctionName('handleSuggestedAction').setParameters({
+              action: action,
+              messageId: 'current',
+            }),
+          ),
+      );
+    });
+
+    card.addSection(actionsSection);
+  }
+
+  // Add back button
+  card.addSection(
+    CardService.newCardSection().addWidget(
+      CardService.newTextButton()
+        .setText('← Back to Email')
+        .setOnClickAction(CardService.newAction().setFunctionName('refreshCard')),
+    ),
+  );
+
+  return card.build();
 }
 
 /**
@@ -1420,15 +1008,45 @@ function handleFollowUpQuestion(e) {
   const messageId = e.parameters.messageId;
 
   try {
-    const authManager = new AuthManager();
-    const result = processFollowUpQuestion(authManager, messageId, question);
+    if (messageId && messageId !== 'current') {
+      const message = GmailApp.getMessageById(messageId);
+      const emailData = {
+        subject: message.getSubject(),
+        body: message.getPlainBody(),
+        from: message.getFrom(),
+        emailId: messageId,
+        userId: authManager.getUserEmailSafely(),
+      };
+
+      // Create a custom prompt for the follow-up question
+      const customPrompt = {
+        emailId: messageId,
+        promptId: 'follow_up',
+        subject: emailData.subject,
+        body: emailData.body + '\n\nFollow-up question: ' + question,
+        from: emailData.from,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Process the follow-up question
+      const result = processPredefinedPrompt(emailData, 'follow_up');
+
+      if (result) {
+        return CardService.newActionResponseBuilder()
+          .setNotification(CardService.newNotification().setText('Follow-up question processed!'))
+          .build();
+      }
+    }
 
     return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText('Processing follow-up question...'))
+      .setNotification(
+        CardService.newNotification().setText('Follow-up question: ' + question.substring(0, 50) + '...'),
+      )
       .build();
   } catch (error) {
+    Logger.log('Handle follow-up question error: ' + error.toString());
     return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText('Unable to process question'))
+      .setNotification(CardService.newNotification().setText('Unable to process follow-up question'))
       .build();
   }
 }
@@ -1441,91 +1059,33 @@ function handleSuggestedAction(e) {
   const messageId = e.parameters.messageId;
 
   try {
-    const authManager = new AuthManager();
-    const result = processSuggestedAction(authManager, messageId, action);
-
-    return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText('Action completed: ' + action))
-      .build();
-  } catch (error) {
-    return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText('Unable to complete action'))
-      .build();
-  }
-}
-
-/**
- * Classify Current Email
- * Triggers email classification for the currently open email
- */
-function classifyCurrentEmail(e) {
-  try {
-    // Get the current message from the context
-    const messageId = e.gmail.messageId;
-    const message = GmailApp.getMessageById(messageId);
-
-    let userEmail;
-    try {
-      userEmail = Session.getActiveUser().getEmail();
-    } catch (userError) {
-      userEmail = 'no-permission@example.com'; // Safe fallback that will fail validation
+    // Perform action based on the suggestion
+    if (action.includes('reply') || action.includes('respond')) {
+      // Open compose window
+      if (messageId && messageId !== 'current') {
+        const message = GmailApp.getMessageById(messageId);
+        message.reply(''); // This opens the compose window
+      }
+    } else if (action.includes('archive') || action.includes('delete')) {
+      // Handle email management actions
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Action "' + action + '" would be performed here'))
+        .build();
+    } else if (action.includes('label') || action.includes('categorize')) {
+      // Handle labeling actions
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Email would be labeled: ' + action))
+        .build();
+    } else {
+      // Generic action
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Action completed: ' + action))
+        .build();
     }
-
-    const emailData = {
-      subject: message.getSubject(),
-      body: message.getPlainBody(),
-      from: message.getFrom(),
-      emailId: messageId,
-      userId: userEmail,
-    };
-
-    // Show loading card
-    return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText('Classifying email...'))
-      .build();
   } catch (error) {
-    Logger.log('Classify current email error: ' + error.toString());
+    Logger.log('Handle suggested action error: ' + error.toString());
     return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText('Unable to classify email'))
-      .build();
-  }
-}
-
-/**
- * Generate Response for Current Email
- * Triggers response generation for the currently open email
- */
-function generateResponseForCurrent(e) {
-  try {
-    const messageId = e.gmail.messageId;
-    const message = GmailApp.getMessageById(messageId);
-
-    let userEmail;
-    try {
-      userEmail = Session.getActiveUser().getEmail();
-    } catch (userError) {
-      userEmail = 'no-permission@example.com'; // Safe fallback that will fail validation
-    }
-
-    const emailData = {
-      subject: message.getSubject(),
-      body: message.getPlainBody(),
-      from: message.getFrom(),
-      emailId: messageId,
-      userId: userEmail,
-    };
-
-    // Call backend to generate response
-    const authManager = new AuthManager();
-    const result = generateComposeEmailResponse(authManager, emailData, 'professional');
-
-    return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText('Response generated!'))
-      .build();
-  } catch (error) {
-    Logger.log('Generate response error: ' + error.toString());
-    return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText('Unable to generate response'))
+      .setNotification(CardService.newNotification().setText('Unable to complete action: ' + action))
       .build();
   }
 }
@@ -1536,12 +1096,7 @@ function generateResponseForCurrent(e) {
  */
 function showFocusMode() {
   try {
-    // Ensure authManager is available
-    if (!authManager) {
-      throw new Error('Authentication manager not available');
-    }
-
-    const focusData = fetchFocusModeData(authManager);
+    const focusData = fetchFocusModeData();
 
     // Create a simple focus mode card
     const card = CardService.newCardBuilder().setHeader(
@@ -1593,13 +1148,6 @@ function analyzeRecentEmails(e) {
     const threads = GmailApp.getInboxThreads(0, count);
     let analyzed = 0;
 
-    let userEmail;
-    try {
-      userEmail = Session.getActiveUser().getEmail();
-    } catch (userError) {
-      userEmail = 'no-permission@example.com'; // Safe fallback that will fail validation
-    }
-
     threads.forEach((thread) => {
       const messages = thread.getMessages();
       messages.forEach((message) => {
@@ -1609,11 +1157,10 @@ function analyzeRecentEmails(e) {
             body: message.getPlainBody(),
             from: message.getFrom(),
             emailId: message.getId(),
-            userId: userEmail,
+            userId: authManager.getUserEmailSafely(),
           };
 
           // Trigger classification (async)
-          const authManager = new AuthManager();
           classifyEmail(emailData);
           analyzed++;
         }
@@ -1637,8 +1184,7 @@ function analyzeRecentEmails(e) {
  */
 function showUserAnalytics() {
   try {
-    const authManager = new AuthManager();
-    const stats = fetchUserStats(authManager);
+    const stats = fetchUserStats();
 
     const card = CardService.newCardBuilder().setHeader(
       CardService.newCardHeader().setTitle('📈 Your Analytics').setSubtitle('Email processing statistics'),
@@ -1675,63 +1221,11 @@ function showUserAnalytics() {
 }
 
 /**
- * Run Quick Prompt
- * Executes a predefined prompt on user's emails
- */
-function runQuickPrompt(e) {
-  const promptId = e.parameters.promptId;
-
-  try {
-    // Get recent emails for analysis
-    const threads = GmailApp.getInboxThreads(0, 3);
-    if (threads.length === 0) {
-      return CardService.newActionResponseBuilder()
-        .setNotification(CardService.newNotification().setText('No emails found for analysis'))
-        .build();
-    }
-
-    const message = threads[0].getMessages()[0];
-    let userEmail;
-    try {
-      userEmail = Session.getActiveUser().getEmail();
-    } catch (userError) {
-      userEmail = 'no-permission@example.com'; // Safe fallback that will fail validation
-    }
-
-    const emailData = {
-      subject: message.getSubject(),
-      body: message.getPlainBody(),
-      from: message.getFrom(),
-      emailId: message.getId(),
-      userId: userEmail,
-    };
-
-    // Process the predefined prompt
-    const authManager = new AuthManager();
-    const result = processPredefinedPrompt(emailData, promptId);
-
-    return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText('Processing prompt...'))
-      .build();
-  } catch (error) {
-    Logger.log('Run quick prompt error: ' + error.toString());
-    return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText('Unable to process prompt'))
-      .build();
-  }
-}
-
-/**
  * Fetch Focus Mode Data
  * Gets focus mode data from backend
  */
-function fetchFocusModeData(authManager) {
+function fetchFocusModeData() {
   try {
-    // Ensure authManager is available
-    if (!authManager) {
-      throw new Error('Authentication manager not available');
-    }
-
     validateAuthentication();
 
     const url = `${getApiBaseUrl()}/dashboard/focus`;
@@ -1761,23 +1255,67 @@ function fetchFocusModeData(authManager) {
 }
 
 /**
- * Test function for development
+ * Trigger Async Classification
+ * Triggers background classification without blocking UI
  */
-function testClassification() {
-  const testEmail = {
-    subject: 'Urgent: Project Update Needed',
-    body: 'Please provide an update on the current project status by tomorrow.',
-    from: 'client@example.com',
-    emailId: 'test-email-id',
-    userId: 'test-user-id',
-  };
-
+function triggerAsyncClassification(emailData, messageId) {
   try {
-    const result = classifyEmail(testEmail);
-    Logger.log('Classification result: ' + JSON.stringify(result));
-    return result;
+    // Use setTimeout to run classification in background
+    setTimeout(function () {
+      try {
+        const result = classifyEmail(emailData);
+        if (result) {
+          const cacheKey = `classification_${messageId}`;
+          CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), CACHE_EXPIRATION);
+          Logger.log(`Classification completed for email ${messageId}`);
+        }
+      } catch (error) {
+        Logger.log(`Async classification failed for email ${messageId}: ${error.toString()}`);
+      }
+    }, 100); // Small delay to prevent blocking
   } catch (error) {
-    Logger.log('Test classification error: ' + error.toString());
+    Logger.log('Error triggering async classification: ' + error.toString());
+  }
+}
+
+/**
+ * Classify Email
+ * Classifies an email using AI and stores the result
+ */
+function classifyEmail(emailData) {
+  try {
+    validateAuthentication();
+
+    const url = `${getApiBaseUrl()}/email/classify`;
+    const headers = authManager.getAuthHeaders();
+
+    const payload = {
+      email_id: emailData.emailId,
+      subject: emailData.subject,
+      body: emailData.body,
+      from: emailData.from,
+      user_id: emailData.userId,
+    };
+
+    const response = UrlFetchApp.fetch(url, {
+      method: 'POST',
+      headers: headers,
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+    });
+
+    const result = JSON.parse(response.getContentText());
+
+    if (result.success) {
+      Logger.log(`Email classified successfully: ${emailData.emailId}`);
+      return result.data;
+    } else {
+      Logger.log(`Classification failed for email ${emailData.emailId}: ${result.error || 'Unknown error'}`);
+      return null;
+    }
+  } catch (error) {
+    Logger.log('Error classifying email: ' + error.toString());
     return null;
   }
 }
