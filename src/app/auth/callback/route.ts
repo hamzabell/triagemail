@@ -4,17 +4,49 @@ import { createClient } from '@/utils/supabase/server';
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
-  // if "next" is in param, use it as the redirect URL
+  const error = searchParams.get('error');
+  const type = searchParams.get('type');
   const next = searchParams.get('next') ?? '/';
 
-  if (code) {
-    const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
-    }
+  // Handle errors
+  if (error) {
+    console.error('Auth callback error:', error);
+    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error)}`);
   }
 
-  // return the user to an error page with instructions
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`);
+  // Handle email verification without code
+  if (type === 'signup' && !code) {
+    return NextResponse.redirect(`${origin}/verify-email?success=true`);
+  }
+
+  // Handle code exchange for session
+  if (code) {
+    const supabase = await createClient();
+    const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (exchangeError) {
+      console.error('Code exchange error:', exchangeError);
+      return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(exchangeError.message)}`);
+    }
+
+    // Check if this is a new user who just verified their email
+    if (data.user && data.user.email_confirmed_at) {
+      const timeSinceConfirmation = Date.now() - new Date(data.user.email_confirmed_at).getTime();
+      const isNewUser = timeSinceConfirmation < 300000; // 5 minutes
+
+      if (isNewUser) {
+        return NextResponse.redirect(`${origin}/verify-email?success=true&verified=true`);
+      }
+    }
+
+    return NextResponse.redirect(`${origin}${next}`);
+  }
+
+  // Handle other auth scenarios
+  if (type === 'recovery') {
+    return NextResponse.redirect(`${origin}/login?message=Password reset successful. Please log in.`);
+  }
+
+  // Fallback to login page
+  return NextResponse.redirect(`${origin}/login`);
 }

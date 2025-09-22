@@ -1,17 +1,27 @@
-import { Inter } from 'next/font/google';
+import { Space_Grotesk, Syne } from 'next/font/google';
 import '../styles/globals.css';
 import '../styles/layout.css';
 import { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { Toaster } from '@/components/ui/toaster';
 
-const inter = Inter({ subsets: ['latin'] });
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  variable: '--font-space-grotesk',
+  display: 'swap',
+});
+
+const syne = Syne({
+  subsets: ['latin'],
+  variable: '--font-syne',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://paddle-billing.vercel.app'),
-  title: 'AeroEdit',
+  metadataBase: new URL('https://triagemail.com'),
+  title: 'TriageMail',
   description:
-    'AeroEdit is a powerful team design collaboration app and image editor. With plans for businesses of all sizes, streamline your workflow with real-time collaboration, advanced editing tools, and seamless project management.',
+    'AI-powered email triage that works everywhere Gmail does. Save 5+ hours weekly with smart categorization and one-click AI responses.',
 };
 
 export default function RootLayout({
@@ -21,7 +31,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={'min-h-full dark'}>
-      <body className={inter.className}>
+      <body className={`${spaceGrotesk.variable} ${syne.variable} font-sans`}>
         {children}
         <Toaster />
       </body>

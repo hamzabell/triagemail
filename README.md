@@ -1,170 +1,326 @@
-# Paddle Billing subscriptions Next.js starter kit
+# TriageMail - AI-Powered Email Management System
 
-[Paddle Billing](https://www.paddle.com/billing?utm_source=dx&utm_medium=paddle-nextjs-starter-kit) is a complete digital product sales and subscription management platform, designed for modern software businesses. It helps you increase your revenue, retain customers, and scale your operations.
-
-This is a complete starter kit that you can use to build and deploy a [Next.js](https://nextjs.org/) SaaS app powered by Paddle Billing.
-
-> **Important:** This starter kit works with Paddle Billing. It does not support Paddle Classic. To work with Paddle Classic, see: [Paddle Classic API reference](https://developer.paddle.com/classic/api-reference/1384a288aca7a-api-reference?utm_source=dx&utm_medium=paddle-nextjs-starter-kit)
-
-## Demo
-
-See it in action: [https://paddle-billing.vercel.app/](https://paddle-billing.vercel.app/?utm_source=dx&utm_medium=paddle-nextjs-starter-kit)
-
-![Illustration showing two screens from the starter kit. On the left is three-tier pricing page. On the right is a subscription page, showing an itemized list of products on the subscription, the next payment, and previous payments.](hero.png)
+TriageMail is an intelligent email management system that uses AI to automatically categorize, prioritize, and suggest responses for incoming emails. Built with Next.js, Supabase, and integrated with Paddle for subscription management.
 
 ## Features
 
-- Three-tier pricing page that's fully localized for 200+ markets using [Paddle.js](https://developer.paddle.com/paddlejs/overview).
-- An integrated checkout experience built with [Paddle Checkout](https://developer.paddle.com/concepts/sell/self-serve-checkout), with secure [optimized payments](https://developer.paddle.com/concepts/payment-methods/overview?utm_source=dx&utm_medium=paddle-nextjs-starter-kit) by card, Apple Pay, Google Pay, PayPal, and others.
-- User management and auth handled by [Supabase](https://supabase.com/).
-- Ready-made screens to let customers manage their payments and subscriptions.
-- Automatic syncing of customer and subscription data between Paddle and your app using [webhooks](https://developer.paddle.com/webhooks/overview?utm_source=dx&utm_medium=paddle-nextjs-starter-kit).
+### Email Management
 
-## Stack
+- **AI-Powered Classification**: Automatically categorizes emails as Urgent, Request, Question, Update, or Spam
+- **Priority Scoring**: Assigns priority levels 1-10 based on content analysis
+- **Smart Response Generation**: AI suggests context-aware responses for each email
+- **Deadline Detection**: Identifies time-sensitive emails and suggests deadlines
+- **Analytics Dashboard**: Track processing statistics, time saved, and accuracy metrics
 
-This starter kit is built with:
+### Subscription Management
 
-- **Framework:** [Next.js](https://nextjs.org/)
-- **Auth and user management:** [Supabase](https://supabase.com/)
-- **Component library:** [shadcn/ui](https://ui.shadcn.com/)
-- **CSS framework:** [Tailwind](https://tailwindcss.com/)
-- **Billing solution**: [Paddle Billing](https://www.paddle.com/billing?utm_source=dx&utm_medium=paddle-nextjs-starter-kit)
+- **Paddle Integration**: Complete subscription billing and payment processing
+- **Tiered Pricing**: Flexible pricing plans with monthly/annual billing
+- **Customer Portal**: Self-service subscription management
+- **Webhook Integration**: Real-time sync between Paddle and your database
+
+## Tech Stack
+
+- **Framework**: [Next.js 15](https://nextjs.org/) with App Router
+- **Authentication**: [Supabase Auth](https://supabase.com/) with email/password
+- **Database**: [Supabase PostgreSQL](https://supabase.com/) with Row Level Security
+- **AI Services**: [LemonFox AI](https://lemonfox.ai/) for email classification
+- **Component Library**: [shadcn/ui](https://ui.shadcn.com/)
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
+- **Payment Processing**: [Paddle Billing](https://www.paddle.com/billing)
+- **Deployment**: [Vercel](https://vercel.com/)
 
 ## Prerequisites
 
-### Local dev environment
+### Local Development
 
-- [Node.js](https://nodejs.org/en/download/package-manager/current) version > `20`
-- [npm](https://www.npmjs.com/), [Yarn](https://yarnpkg.com/), or [pnpm](https://pnpm.io/)
+- Node.js version > 20
+- npm, Yarn, or pnpm
 
-### Accounts
+### Required Accounts
 
-- [Vercel account](https://vercel.com/)
 - [Supabase account](https://supabase.com/)
-- [Paddle Billing](https://sandbox-login.paddle.com/signup?utm_source=dx&utm_medium=paddle-nextjs-starter-kit) — sandbox recommended
+- [Paddle Billing account](https://sandbox-login.paddle.com/signup) (sandbox recommended)
+- [LemonFox AI account](https://lemonfox.ai/) for AI services
+- [Vercel account](https://vercel.com/) for deployment
 
-## Step-by-step setup
+## Quick Start
 
-> **Important:** If you're totally new to Next.js and Paddle, we have a more complete tutorial on our dev docs: [Build and deploy Next.js app with Vercel and Supabase](https://developer.paddle.com/build/nextjs-supabase-vercel-starter-kit?utm_source=dx&utm_medium=paddle-nextjs-starter-kit)
+### 1. Clone and Install
 
-### 1. Deploy on Vercel
+```bash
+git clone https://github.com/your-repo/triagemail.git
+cd triagemail
+npm install
+```
 
-#### Start deploy
+### 2. Environment Setup
 
-Click this button to clone this repo and create a new project in your Vercel account:
+Copy the example environment file:
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FPaddleHQ%2Fpaddle-nextjs-starter-kit&env=PADDLE_API_KEY,PADDLE_NOTIFICATION_WEBHOOK_SECRET,NEXT_PUBLIC_PADDLE_ENV,NEXT_PUBLIC_PADDLE_CLIENT_TOKEN&integration-ids=oac_VqOgBHqhEoFTPzGkPd7L0iH6&external-id=https%3A%2F%2Fgithub.com%2FPaddleHQ%2Fpaddle-nextjs-starter-kit%2Ftree%2Fmain)
+```bash
+cp .env.local.example .env.local
+```
 
-You can also [create a new application manually](https://vercel.com/new).
+Configure your environment variables:
 
-#### Configure project
+```env
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-Click **Add** to walk through integrating with Supabase. You'll be asked to authenticate with Supabase and confirm creating the database schemas.
+# Paddle Configuration
+NEXT_PUBLIC_PADDLE_ENV=sandbox
+PADDLE_API_KEY=your-paddle-api-key
+NEXT_PUBLIC_PADDLE_CLIENT_TOKEN=your-paddle-client-token
+PADDLE_NOTIFICATION_WEBHOOK_SECRET=your-webhook-secret
 
-Then, enter Paddle environment variables:
+# AI Service Configuration
+LEMONFOX_API_KEY=your-lemonfox-api-key
+```
 
-| Variable                             | Used for                                                                                                                                                                                                                                                                   | How to get it                                                                                                                                                                                                                                                |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `PADDLE_API_KEY`                     | An [API key](https://developer.paddle.com/api-reference/about/authentication?utm_source=dx&utm_medium=paddle-nextjs-starter-kit), used for interacting with Paddle data in the backend. For example, syncing customer and subscription data with Supabase.                 | Go to [**Paddle > Developer tools > Authentication**](https://sandbox-vendors.paddle.com/authentication-v2) and create a new API key.                                                                                                                        |
-| `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN`    | A [client-side key](https://developer.paddle.com/api-reference/about/authentication?utm_source=dx&utm_medium=paddle-nextjs-starter-kit), used for interacting with Paddle in the frontend. For example, getting localized prices for pricing pages and opening a checkout. | Go to [**Paddle > Developer tools > Authentication**](https://sandbox-vendors.paddle.com/authentication-v2) and create a new client-side token.                                                                                                              |
-| `PADDLE_NOTIFICATION_WEBHOOK_SECRET` | A secret key used for verifying that [webhooks](https://developer.paddle.com/webhooks/notification-destinations?utm_source=dx&utm_medium=paddle-nextjs-starter-kit) came from Paddle and haven't been tampered with in transit. Important for security.                    | Go to [**Paddle > Developer tools > Notifications**](https://sandbox-vendors.paddle.com/notifications), create a new notification destination for your Vercel deploy URL + `/api/webhook`, then edit to copy the secret key. See below for more information. |
-| `NEXT_PUBLIC_PADDLE_ENV`             | Environment for our Paddle account. This should match the kind of Paddle account you signed up for.                                                                                                                                                                        | Enter `sandbox` for sandbox accounts or `production` for live accounts.                                                                                                                                                                                      |
+### 3. Database Setup
 
-Use `https://<PROJECTNAME>.vercel.app/api/webhook` as the endpoint URL for your notification destination, where `<PROJECTNAME>` is the name of your project in Vercel. For example, `https://paddle-billing.vercel.app/api/webhook`.
+1. Create a new project in your Supabase dashboard
+2. Run the database migration:
 
-If your project name isn't unique, your Vercel deploy URL may not match the URL you enter here. We can review and update this after deploy.
+```sql
+-- Run this in your Supabase SQL editor
+-- See: supabase/migrations/20250922000000_migrate_email_schema.sql
+```
 
-#### Deploy
+The migration includes:
 
-Click **Deploy** when you're done. Wait for Vercel to build.
+- User management tables
+- Email classification and response storage
+- Analytics tracking
+- Paddle integration tables
+- Row Level Security policies
 
-### 2. Set up product catalog
+### 4. Development Server
 
-#### Clone locally
+Start the development server:
 
-1. Clone the repository you created earlier.
+```bash
+npm run dev
+```
 
-   ```sh
-   git clone https://github.com/PATH_TO_YOUR_REPO
+Visit `http://localhost:3000` to see the application.
+
+## Project Structure
+
+```
+src/
+├── app/                          # Next.js App Router
+│   ├── (auth)/                   # Auth-protected routes
+│   │   ├── dashboard/           # Dashboard and email management
+│   │   └── api/                 # API endpoints
+│   ├── login/                    # Login page
+│   ├── signup/                   # Signup page
+│   └── page.tsx                  # Landing page
+├── components/                   # React components
+│   ├── ui/                       # shadcn/ui components
+│   ├── authentication/           # Auth components
+│   ├── dashboard/                # Dashboard components
+│   └── checkout/                 # Paddle checkout components
+├── lib/                          # Utility libraries
+│   ├── auth.ts                   # Authentication utilities
+│   ├── db.ts                     # Database utilities
+│   ├── ai.ts                     # AI service integration
+│   └── utils/                    # Helper functions
+├── styles/                       # Global styles
+└── utils/                        # Client utilities
+```
+
+## API Endpoints
+
+### Authentication
+
+- `/api/auth/callback` - OAuth callback handler
+- `/api/user` - Get current user info
+
+### Email Management
+
+- `/api/email/classify` - Classify an email using AI
+- `/api/dashboard/stats` - Get dashboard statistics
+- `/api/dashboard/recent` - Get recent email classifications
+
+### System
+
+- `/api/health` - Health check endpoint
+- `/api/test` - Environment validation
+- `/api/webhook` - Paddle webhook handler
+
+## Database Schema
+
+### Core Tables
+
+- `users` - User accounts and profiles
+- `classifications` - Email classification results
+- `responses` - Suggested email responses
+- `analytics` - Usage statistics and metrics
+
+### Paddle Integration Tables
+
+- `customers` - Paddle customer data
+- `subscriptions` - Subscription information
+- `prices` - Product pricing data
+- `transactions` - Payment transactions
+
+## Configuration
+
+### AI Service
+
+The email classification system uses LemonFox AI with the following categories:
+
+- **Urgent**: Time-sensitive or critical issues
+- **Request**: Action items or meeting requests
+- **Question**: Information inquiries
+- **Update**: Informational emails
+- **Spam**: Unwanted content
+
+### Theme Customization
+
+The TriageMail brand uses:
+
+- **Primary**: `#FF3366` (Pink)
+- **Secondary**: `#1D3557` (Navy Blue)
+- **Accent**: `#A8DADC` (Light Blue)
+- **Fonts**: Space Grotesk (headings), Syne (body)
+
+### Authentication
+
+The system uses Supabase Auth with:
+
+- Email/password authentication only
+- JWT-based session management
+- Row Level Security for data protection
+
+## Deployment
+
+### Vercel Deployment
+
+1. **Deploy to Vercel**
+
+   ```bash
+   npx vercel --prod
    ```
 
-2. Install dependencies using npm, Yarn, or pnpm.
+2. **Configure Environment Variables**
+   Add all required environment variables to your Vercel project settings
 
-   Install using npm:
+3. **Set Up Paddle Webhooks**
+   - Create a notification destination in Paddle
+   - Use `https://your-app.vercel.app/api/webhook` as the endpoint
+   - Add the webhook secret to your environment variables
 
-   ```sh
-   npm install
-   ```
+4. **Configure Domain Approval**
+   - Submit your domain for approval in Paddle
+   - Set up checkout settings
 
-   Install using Yarn:
+### Environment Setup
 
-   ```sh
-   yarn install
-   ```
+For production deployment:
 
-   Install using pnpm:
+1. **Supabase Production**
+   - Create a production Supabase project
+   - Run migrations in the production environment
+   - Update environment variables with production URLs
 
-   ```sh
-   pnpm install
-   ```
+2. **Paddle Production**
+   - Apply for a live Paddle account
+   - Create live products and prices
+   - Update pricing constants in `src/constants/pricing-tier.ts`
 
-#### Add products and prices
+3. **Domain Configuration**
+   - Configure your custom domain in Vercel
+   - Set up SSL certificates
+   - Update Paddle with your production domain
 
-[Create products and prices](https://developer.paddle.com/build/products/create-products-prices?utm_source=dx&utm_medium=paddle-nextjs-starter-kit) in Paddle for your subscription plans. We recommend creating three products for your plans, with two prices for each product to describe how you bill. For example, create a product called "Pro plan" with two prices for "monthly" and "annual."
+## Testing
 
-Next, copy your price IDs and update the [`pricing-tier.ts`](src/constants/pricing-tier.ts) constants file with your new prices.
+### Unit Tests
 
-Commit and push your changes to `main`.
+```bash
+npm run test
+```
 
-### 3. Add URL to Paddle and test
+### Integration Tests
 
-#### Add deploy URL to Paddle
+```bash
+npm run test:integration
+```
 
-You must add URLs to Paddle before you can launch a checkout from them. This protects you as a seller, making sure that only you're able to sell your products.
+### End-to-End Tests
 
-1. Go to [**Paddle > Checkout > Website approval**](https://sandbox-vendors.paddle.com/request-domain-approval), then enter your Vercel demo app link and click **Submit for approval**.
-2. Go to [**Paddle > Checkout > Checkout settings**](https://sandbox-vendors.paddle.com/checkout-settings), then enter your Vercel demo app link as your default payment link and click **Save**.
-3. Go to [**Paddle > Developer tools > Notifications**](https://sandbox-vendors.paddle.com/notifications), then check that the endpoint URL matches your Vercel demo app link domain.
+```bash
+npm run test:e2e
+```
 
-> **Important:** Website approval is instant for sandbox accounts, but may take a little while for live accounts while the Paddle seller verification team check your website.
+### Build Validation
 
-#### Test
+```bash
+npm run build
+npm run lint
+npm run type-check
+```
 
-Open your Vercel demo site. You should notice that Paddle returns the prices you entered for each of your plans on your pricing page.
+## Security Considerations
 
-Click **Get started** to launch a checkout for a plan, then take a test payment.
+- **Row Level Security**: All database tables have RLS policies
+- **Environment Variables**: sensitive data stored in environment variables
+- **API Rate Limiting**: Implement rate limiting for AI endpoints
+- **Webhook Verification**: Paddle webhooks are verified using secrets
+- **CSRF Protection**: Next.js provides built-in CSRF protection
 
-If you're using a sandbox account, you can take a test payment using [our test card details](https://developer.paddle.com/concepts/payment-methods/credit-debit-card?utm_source=dx&utm_medium=paddle-nextjs-starter-kit):
+## Monitoring
 
-| Field                      | Value                                 |
-| -------------------------- | ------------------------------------- |
-| **Email address**          | An email address you own              |
-| **Country**                | Any valid country supported by Paddle |
-| **ZIP code** (if required) | Any valid ZIP or postal code          |
-| **Card number**            | `4242 4242 4242 4242`                 |
-| **Name on card**           | Any name                              |
-| **Expiration date**        | Any valid date in the future.         |
-| **Security code**          | `100`                                 |
+### Application Monitoring
 
-After checkout is completed, head back to the homepage and click **Sign in**. Have a look at the subscriptions and payments pages. They pull information from Paddle about a customer's subscriptions and transactions.
+- **Vercel Analytics**: Performance metrics and error tracking
+- **Supabase Logs**: Database query monitoring
+- **Paddle Dashboard**: Transaction and subscription monitoring
 
-### 4. Next steps
+### Error Tracking
 
-You're done! 🎉 You can use this starter kit as a basis for building a SaaS app powered by Paddle Billing.
+- **Next.js Error Reporting**: Built-in error reporting
+- **Console Logging**: Structured logging for debugging
+- **Health Checks**: `/api/health` endpoint for monitoring
 
-Once you've built your app, transition to a live account to start taking real payments:
+## Contributing
 
-1. [Sign up for a live account](https://login.paddle.com/signup?utm_source=dx&utm_medium=paddle-nextjs-starter-kit), then follow our [go-live checklist](https://developer.paddle.com/build/onboarding/go-live-checklist) to transition from sandbox to live.
-2. Update your environment variables so they're for your live account.
-3. Create new schemas in Supabase for your live data.
-4. [Set up Paddle Retain](https://developer.paddle.com/build/retain/set-up-retain-profitwell) to handle payment recovery.
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Run the test suite
+6. Submit a pull request
 
-## Get help
+## Support
 
-For help, contact the Paddle DX team at `team-dx@paddle.com`.
+For technical support:
 
-## Learn more
+- **Documentation**: Check this README and inline code comments
+- **Issues**: Report bugs and request features on GitHub
+- **Email**: Contact support@triagemail.com
 
-- [Build and deploy Next.js app with Vercel and Supabase](https://developer.paddle.com/build/nextjs-supabase-vercel-starter-kit?utm_source=dx&utm_medium=paddle-nextjs-starter-kit)
-- [Paddle API reference](https://developer.paddle.com/api-reference/overview?utm_source=dx&utm_medium=paddle-nextjs-starter-kit)
-- [Sign up for Paddle Billing](https://sandbox-login.paddle.com/signup?utm_source=dx&utm_medium=paddle-nextjs-starter-kit)
+For service-specific support:
+
+- **Supabase**: [Supabase Support](https://supabase.com/support)
+- **Paddle**: [Paddle Developer Support](https://developer.paddle.com/support)
+- **LemonFox AI**: [LemonFox Documentation](https://lemonfox.ai/docs)
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Changelog
+
+### v1.0.0
+
+- Initial release with AI email classification
+- Paddle subscription integration
+- Supabase authentication
+- Responsive dashboard interface
+- Analytics and reporting features

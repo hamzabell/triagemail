@@ -1,57 +1,70 @@
 'use client';
 
-import Image from 'next/image';
-import { Button } from '@/components/ui/button';
-import { login, loginAnonymously } from '@/app/login/actions';
+import { login } from '@/app/login/actions';
 import { useState } from 'react';
 import { AuthenticationForm } from '@/components/authentication/authentication-form';
-import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/components/ui/use-toast';
 
 export function LoginForm() {
   const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  function handleLogin() {
-    login({ email, password }).then((data) => {
-      if (data?.error) {
-        toast({ description: 'Invalid email or password', variant: 'destructive' });
-      }
-    });
-  }
+  async function handleLogin(e?: React.FormEvent) {
+    if (e) e.preventDefault();
 
-  function handleAnonymousLogin() {
-    loginAnonymously().then((data) => {
-      if (data?.error) {
-        toast({ description: 'Something went wrong. Please try again', variant: 'destructive' });
+    setIsLoading(true);
+    try {
+      const result = await login({ email, password });
+
+      if (result?.error) {
+        toast({
+          title: 'Login Failed',
+          description: result.error || 'Invalid email or password. Please try again.',
+          variant: 'destructive',
+        });
+      } else if (result?.success && result?.redirect) {
+        toast({
+          title: 'Welcome Back!',
+          description: 'Successfully logged in to your account.',
+        });
+        // Use window.location for redirect to avoid 303 error
+        window.location.href = result.redirect;
+      } else if (result?.success) {
+        toast({
+          title: 'Welcome Back!',
+          description: 'Successfully logged in to your account.',
+        });
+        window.location.href = '/';
       }
-    });
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Something went wrong. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
-    <form action={'#'} className={'px-6 md:px-16 pb-6 py-8 gap-6 flex flex-col items-center justify-center'}>
-      <Image src={'/assets/icons/logo/aeroedit-icon.svg'} alt={'AeroEdit'} width={80} height={80} />
-      <div className={'text-[30px] leading-[36px] font-medium tracking-[-0.6px] text-center'}>
-        Log in to your account
-      </div>
-      <Button onClick={() => handleAnonymousLogin()} type={'button'} variant={'secondary'} className={'w-full mt-6'}>
-        Log in as Guest
-      </Button>
-      <div className={'flex w-full items-center justify-center'}>
-        <Separator className={'w-5/12 bg-border'} />
-        <div className={'text-border text-xs font-medium px-4'}>or</div>
-        <Separator className={'w-5/12 bg-border'} />
-      </div>
+    <div className="space-y-6">
       <AuthenticationForm
         email={email}
         onEmailChange={(email) => setEmail(email)}
         password={password}
         onPasswordChange={(password) => setPassword(password)}
       />
-      <Button formAction={() => handleLogin()} type={'submit'} variant={'secondary'} className={'w-full'}>
-        Log in
-      </Button>
-    </form>
+
+      <button
+        onClick={handleLogin}
+        disabled={isLoading}
+        className="w-full bg-[#FF3366] text-white py-3 rounded-full font-semibold text-base hover:bg-[#E63946] transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+      >
+        {isLoading ? 'Logging in...' : 'Log In'}
+      </button>
+    </div>
   );
 }

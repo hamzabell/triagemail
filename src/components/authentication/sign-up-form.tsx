@@ -1,7 +1,5 @@
 'use client';
 
-import Image from 'next/image';
-import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { AuthenticationForm } from '@/components/authentication/authentication-form';
 import { signup } from '@/app/signup/actions';
@@ -11,28 +9,65 @@ export function SignupForm() {
   const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  function handleSignup() {
-    signup({ email, password }).then((data) => {
-      if (data?.error) {
-        toast({ description: 'Something went wrong. Please try again', variant: 'destructive' });
+  async function handleSignup(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+
+    setIsLoading(true);
+    try {
+      const result = await signup({ email, password });
+
+      if (result?.error) {
+        toast({
+          title: 'Sign Up Failed',
+          description: result.error || 'Something went wrong. Please try again.',
+          variant: 'destructive',
+        });
+      } else if (result?.success) {
+        toast({
+          title: 'Account Created!',
+          description: result.message || 'Welcome to TriageMail! Please check your email to verify your account.',
+        });
+
+        // Redirect to verification page if email confirmation is required
+        if (result.requiresEmailConfirmation) {
+          window.location.href = '/verify-email';
+        } else if (result.redirect) {
+          window.location.href = result.redirect;
+        }
+      } else {
+        toast({
+          title: 'Account Created!',
+          description: 'Welcome to TriageMail! Please check your email to verify your account.',
+        });
       }
-    });
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Something went wrong. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
-    <form action={'#'} className={'px-6 md:px-16 pb-6 py-8 gap-6 flex flex-col items-center justify-center'}>
-      <Image src={'/assets/icons/logo/aeroedit-icon.svg'} alt={'AeroEdit'} width={80} height={80} />
-      <div className={'text-[30px] leading-[36px] font-medium tracking-[-0.6px] text-center'}>Create an account</div>
+    <div className="space-y-6">
       <AuthenticationForm
         email={email}
         onEmailChange={(email) => setEmail(email)}
         password={password}
         onPasswordChange={(password) => setPassword(password)}
       />
-      <Button formAction={() => handleSignup()} type={'submit'} variant={'secondary'} className={'w-full'}>
-        Sign up
-      </Button>
-    </form>
+      <button
+        onClick={handleSignup}
+        disabled={isLoading}
+        className="w-full bg-[#FF3366] text-white py-3 rounded-full font-semibold text-base hover:bg-[#E63946] transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+      >
+        {isLoading ? 'Creating Account...' : 'Sign Up'}
+      </button>
+    </div>
   );
 }
