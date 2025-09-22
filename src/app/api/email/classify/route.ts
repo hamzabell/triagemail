@@ -2,30 +2,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { supabase } from '@/lib/db';
 import { aiService } from '@/lib/ai';
-import { withGmailAddonValidation, getGmailAddonUserInfo } from '@/lib/gmail-validation-middleware';
+import { GmailAddonAuth } from '@/lib/gmail-auth';
 
-// Wrap the handler with Gmail add-on validation
-export const POST = withGmailAddonValidation(async (request: NextRequest) => {
-  // Get user info from validated request (either from Gmail add-on or regular auth)
-  const userInfo = getGmailAddonUserInfo(request);
-
-  let user;
-  if (userInfo) {
-    // Gmail add-on authenticated user
-    user = {
-      id: userInfo.userId,
-      email: userInfo.userEmail,
-    };
-  } else {
-    // Regular authenticated user
-    const authUser = await requireAuth();
-    if (authUser instanceof NextResponse) {
-      return authUser;
-    }
-    user = authUser;
-  }
-
+export const POST = async (request: NextRequest) => {
   try {
+    // First, try Gmail add-on authentication
+    const validationResult = await GmailAddonAuth.validateRequest(request);
+
+    let user;
+    if (validationResult.valid) {
+      // Gmail add-on authenticated user
+      user = {
+        id: validationResult.user!.id,
+        email: validationResult.user!.email,
+      };
+    } else {
+      // Fall back to regular authentication
+      const authUser = await requireAuth();
+      if (authUser instanceof NextResponse) {
+        return authUser;
+      }
+      user = authUser;
+    }
+
     const { subject, body, from, emailId } = await request.json();
 
     // Validate required fields
@@ -158,4 +157,4 @@ export const POST = withGmailAddonValidation(async (request: NextRequest) => {
     console.error('Email classification error:', error);
     return NextResponse.json({ error: 'Failed to classify email' }, { status: 500 });
   }
-});
+};

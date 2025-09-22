@@ -148,9 +148,9 @@ function onGmailMessageOpen(e) {
       return createEmailCard(emailData, classification);
     }
 
-    // Trigger async classification and return loading card
-    triggerAsyncClassification(emailData, messageId);
-    return createLoadingCard();
+    // For now, return a card with quick actions instead of async classification
+    // User can manually trigger classification using the buttons
+    return createEmailCardWithQuickActions(emailData);
   } catch (error) {
     Logger.log('Error in message open trigger: ' + error.toString());
     return createErrorCard('Unable to process email');
@@ -453,6 +453,106 @@ function createErrorCard(errorMessage) {
 }
 
 /**
+ * Create Email Card with Quick Actions
+ * Shows quick action buttons when email is not yet classified
+ */
+function createEmailCardWithQuickActions(emailData) {
+  const card = CardService.newCardBuilder().setHeader(
+    CardService.newCardHeader().setTitle('TriageMail Analysis').setSubtitle(emailData.subject),
+  );
+
+  const introSection = CardService.newCardSection()
+    .addWidget(
+      CardService.newTextParagraph().setText(
+        '📧 Email ready for analysis. Use the quick actions below to get AI-powered insights and response suggestions.',
+      ),
+    )
+    .addWidget(
+      CardService.newKeyValue().setTopLabel('From').setContent(emailData.from).setIcon(CardService.Icon.PERSON),
+    )
+    .addWidget(
+      CardService.newKeyValue()
+        .setTopLabel('Subject')
+        .setContent(emailData.subject)
+        .setIcon(CardService.Icon.DESCRIPTION),
+    );
+
+  card.addSection(introSection);
+
+  const quickActionsSection = CardService.newCardSection()
+    .setHeader('🚀 Quick Actions')
+    .addWidget(
+      CardService.newTextButton()
+        .setText('📊 Analyze Email')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('handlePredefinedPrompt').setParameters({
+            promptId: 'assess_business_impact',
+            messageId: emailData.emailId,
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setBackgroundColor('#06D6A0'),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('📝 Generate Response')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('handlePredefinedPrompt').setParameters({
+            promptId: 'professional_reply',
+            messageId: emailData.emailId,
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setBackgroundColor('#457B9D'),
+    );
+
+  card.addSection(quickActionsSection);
+
+  const moreActionsSection = CardService.newCardSection()
+    .setHeader('🔍 More Analysis Options')
+    .addWidget(
+      CardService.newTextButton()
+        .setText('⏱️ Check Urgency')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('handlePredefinedPrompt').setParameters({
+            promptId: 'identify_urgency',
+            messageId: emailData.emailId,
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
+        .setBackgroundColor('#F1FAEE'),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('📋 Extract Actions')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('handlePredefinedPrompt').setParameters({
+            promptId: 'extract_action_items',
+            messageId: emailData.emailId,
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
+        .setBackgroundColor('#A8DADC'),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('📄 Summarize')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('handlePredefinedPrompt').setParameters({
+            promptId: 'summarize_key_points',
+            messageId: emailData.emailId,
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
+        .setBackgroundColor('#E9C46A'),
+    );
+
+  card.addSection(moreActionsSection);
+
+  return card.build();
+}
+
+/**
  * Create Compose Card
  */
 function createComposeCard() {
@@ -489,38 +589,6 @@ function createComposeCard() {
     );
 
   card.addSection(stylesSection);
-
-  return card.build();
-}
-
-/**
- * Create Prompt Result Card
- */
-function createPromptResultCard(result, promptId) {
-  const card = CardService.newCardBuilder().setHeader(
-    CardService.newCardHeader().setTitle('AI Analysis Result').setSubtitle('Powered by TriageMail'),
-  );
-
-  const resultSection = CardService.newCardSection().addWidget(
-    CardService.newTextParagraph().setText(result.result || result.response || 'Analysis completed'),
-  );
-
-  card.addSection(resultSection);
-
-  if (result.confidence) {
-    const confidenceText = Math.round(result.confidence * 100) + '% confidence';
-    card.addSection(
-      CardService.newCardSection().addWidget(CardService.newTextParagraph().setText(`Confidence: ${confidenceText}`)),
-    );
-  }
-
-  card.addSection(
-    CardService.newCardSection().addWidget(
-      CardService.newTextButton()
-        .setText('Back to Email')
-        .setOnClickAction(CardService.newAction().setFunctionName('refreshCard')),
-    ),
-  );
 
   return card.build();
 }
@@ -1251,30 +1319,6 @@ function fetchFocusModeData() {
   } catch (error) {
     Logger.log('Error fetching focus data: ' + error.toString());
     return { urgent: 0, today: 0, actions: 0 };
-  }
-}
-
-/**
- * Trigger Async Classification
- * Triggers background classification without blocking UI
- */
-function triggerAsyncClassification(emailData, messageId) {
-  try {
-    // Use setTimeout to run classification in background
-    setTimeout(function () {
-      try {
-        const result = classifyEmail(emailData);
-        if (result) {
-          const cacheKey = `classification_${messageId}`;
-          CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), CACHE_EXPIRATION);
-          Logger.log(`Classification completed for email ${messageId}`);
-        }
-      } catch (error) {
-        Logger.log(`Async classification failed for email ${messageId}: ${error.toString()}`);
-      }
-    }, 100); // Small delay to prevent blocking
-  } catch (error) {
-    Logger.log('Error triggering async classification: ' + error.toString());
   }
 }
 
