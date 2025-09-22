@@ -21,7 +21,7 @@ export async function validateGmailAddonRequest(request: NextRequest): Promise<N
     }
 
     // Check rate limits
-    const rateLimitOk = await GmailAddonAuth.checkRateLimit(validationResult.user.id);
+    const rateLimitOk = await GmailAddonAuth.checkRateLimit(validationResult.user?.id || '');
     if (!rateLimitOk) {
       return NextResponse.json(
         {
@@ -34,18 +34,10 @@ export async function validateGmailAddonRequest(request: NextRequest): Promise<N
 
     // Add user info to request headers for downstream use
     const headers = new Headers(request.headers);
-    headers.set('X-User-ID', validationResult.user.id);
-    headers.set('X-User-Email', validationResult.user.email);
-    headers.set('X-Subscription-Status', validationResult.subscription.status);
-    headers.set('X-Subscription-ID', validationResult.subscription.id);
-
-    // Create modified request with additional headers
-    const modifiedRequest = new Request(request.url, {
-      method: request.method,
-      headers: headers,
-      body: request.body,
-      duplex: request.duplex,
-    });
+    headers.set('X-User-ID', validationResult.user?.id || '');
+    headers.set('X-User-Email', validationResult.user?.email || '');
+    headers.set('X-Subscription-Status', validationResult.subscription?.status || '');
+    headers.set('X-Subscription-ID', validationResult.subscription?.id || '');
 
     // Return null to indicate validation passed
     return null;
@@ -64,8 +56,8 @@ export async function validateGmailAddonRequest(request: NextRequest): Promise<N
 /**
  * Higher-order function to wrap route handlers with Gmail add-on validation
  */
-export function withGmailAddonValidation(handler: (request: NextRequest, context?: any) => Promise<NextResponse>) {
-  return async (request: NextRequest, context?: any): Promise<NextResponse> => {
+export function withGmailAddonValidation(handler: (request: NextRequest, context?: unknown) => Promise<NextResponse>) {
+  return async (request: NextRequest, context?: unknown): Promise<NextResponse> => {
     // Run validation middleware
     const validationResponse = await validateGmailAddonRequest(request);
 

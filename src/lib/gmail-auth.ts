@@ -1,12 +1,23 @@
 import { NextRequest } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import jwt from 'jsonwebtoken';
+import * as crypto from 'crypto';
 
 export interface GmailAddonValidationResult {
   valid: boolean;
-  user?: any;
+  user?: {
+    id: string;
+    email: string;
+    name?: string;
+    created_at: string;
+  };
   error?: string;
-  subscription?: any;
+  subscription?: {
+    id: string;
+    status: string;
+    plan_id: string;
+    current_period_end: string;
+  };
 }
 
 export interface GmailAddonHeaders {
@@ -43,10 +54,14 @@ export class GmailAddonAuth {
   /**
    * Validate JWT token from Gmail add-on request
    */
-  static validateToken(token: string): any {
+  static validateToken(token: string): { userId: string; email: string } {
     try {
-      return jwt.verify(token, this.JWT_SECRET);
-    } catch (error) {
+      const decoded = jwt.verify(token, this.JWT_SECRET);
+      if (typeof decoded === 'string') {
+        throw new Error('Invalid JWT token format');
+      }
+      return decoded as { userId: string; email: string };
+    } catch (_error) {
       throw new Error('Invalid JWT token');
     }
   }
@@ -164,13 +179,18 @@ export class GmailAddonAuth {
 
       return {
         valid: true,
-        user,
+        user: {
+          id: user.id,
+          email: user.email || '',
+          name: user.user_metadata?.name || user.email || '',
+          created_at: user.created_at,
+        },
         subscription,
       };
     } catch (error) {
       return {
         valid: false,
-        error: `Authentication validation failed: ${error.message}`,
+        error: `Authentication validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       };
     }
   }
@@ -196,7 +216,7 @@ export class GmailAddonAuth {
     }
 
     // Allow 100 requests per hour
-    return count < 100;
+    return (count || 0) < 100;
   }
 
   /**
@@ -224,7 +244,6 @@ export class GmailAddonAuth {
    * Create request signature for additional security
    */
   static createSignature(payload: string, timestamp: string): string {
-    const crypto = require('crypto');
     const data = `${payload}.${timestamp}.${this.API_KEY}`;
     return crypto.createHmac('sha256', this.JWT_SECRET).update(data).digest('hex');
   }

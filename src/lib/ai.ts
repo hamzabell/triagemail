@@ -233,16 +233,18 @@ export class AIService {
 
         // Enhanced features with defaults
         actionItems: Array.isArray(result.actionItems)
-          ? result.actionItems.map((item: any) => ({
-              task: item.task || '',
-              assignee: item.assignee || 'user',
-              urgency: item.urgency || 'medium',
-              deadline: item.deadline || null,
-            }))
+          ? result.actionItems.map(
+              (item: { task?: string; assignee?: string; urgency?: string; deadline?: string | null }) => ({
+                task: item.task || '',
+                assignee: item.assignee || 'user',
+                urgency: item.urgency || 'medium',
+                deadline: item.deadline || null,
+              }),
+            )
           : [],
 
         deadlines: Array.isArray(result.deadlines)
-          ? result.deadlines.map((dl: any) => ({
+          ? result.deadlines.map((dl: { date?: string; description?: string; confidence?: number }) => ({
               date: dl.date || '',
               description: dl.description || '',
               confidence: Math.min(1, Math.max(0, dl.confidence || 0.5)),
@@ -257,12 +259,14 @@ export class AIService {
         },
 
         quickActions: Array.isArray(result.quickActions)
-          ? result.quickActions.map((action: any) => ({
-              type: action.type || 'follow_up',
-              label: action.label || 'Follow Up',
-              description: action.description || '',
-              autoResponse: action.autoResponse || undefined,
-            }))
+          ? result.quickActions.map(
+              (action: { type?: string; label?: string; description?: string; autoResponse?: string }) => ({
+                type: action.type || 'follow_up',
+                label: action.label || 'Follow Up',
+                description: action.description || '',
+                autoResponse: action.autoResponse || undefined,
+              }),
+            )
           : [],
 
         // Original fields for compatibility
@@ -607,7 +611,7 @@ export class AIService {
   /**
    * Generate follow-up questions based on prompt type and result
    */
-  private generateFollowUpQuestions(promptId: string, result: string): string[] {
+  private generateFollowUpQuestions(promptId: string, _result: string): string[] {
     const followUpMap: Record<string, string[]> = {
       summarize_key_points: [
         'Would you like me to expand on any specific point?',
@@ -627,7 +631,7 @@ export class AIService {
   /**
    * Generate suggested actions based on prompt type and result
    */
-  private generateSuggestedActions(promptId: string, result: string): string[] {
+  private generateSuggestedActions(promptId: string, _result: string): string[] {
     const actionMap: Record<string, string[]> = {
       extract_action_items: ['Add to task list', 'Schedule reminder', 'Delegate items'],
       should_respond: ['Draft response', 'Schedule for later', 'Mark as complete'],

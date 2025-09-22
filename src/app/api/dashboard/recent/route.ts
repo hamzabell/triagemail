@@ -10,10 +10,10 @@ export async function GET() {
   }
 
   try {
-    const { data: dbUser, error: userError } = await supabase.from('users').select('*').eq('id', authUser.id).single();
+    const { error: userError } = await supabase.from('users').select('*').eq('id', authUser.id).single();
 
     if (userError) {
-      const { data: newUser, error: createError } = await supabase
+      const { error: createError } = await supabase
         .from('users')
         .insert([
           {

@@ -1,6 +1,7 @@
 import * as React from 'react';
 import * as LabelPrimitive from '@radix-ui/react-label';
 import { cva, type VariantProps } from 'class-variance-authority';
+import { Control } from 'react-hook-form';
 import { cn } from '@/lib/utils';
 
 import { Label } from '@/components/ui/label';
@@ -80,10 +81,10 @@ const FormField = React.forwardRef<
   HTMLDivElement,
   {
     name: string;
-    control?: any;
+    control?: Control<Record<string, unknown>>;
     render: (props: { field: unknown; fieldState: unknown }) => React.ReactElement;
   }
->(({ name, control, render, ...props }, ref) => {
+>(({ ...props }, ref) => {
   return <div ref={ref} {...props} />;
 });
 FormField.displayName = 'FormField';

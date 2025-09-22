@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Mail, Clock, Target, TrendingUp, AlertTriangle } from 'lucide-react';
@@ -39,7 +38,6 @@ interface DashboardStats {
 }
 
 export default function TriageMailDashboard() {
-  const router = useRouter();
   const [emails, setEmails] = useState<EmailClassification[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -294,7 +292,7 @@ export default function TriageMailDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {emails.slice(0, 5).map((email, index) => {
+              {emails.slice(0, 5).map((email) => {
                 const timeAgo = getTimeAgo(new Date(email.processedAt));
                 const getActivityColor = (category: string) => {
                   switch (category) {

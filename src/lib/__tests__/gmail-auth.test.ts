@@ -5,6 +5,9 @@ import { NextRequest } from 'next/server';
 jest.mock('jsonwebtoken');
 jest.mock('@/utils/supabase/server');
 
+// Import the mocked module
+import jwt from 'jsonwebtoken';
+
 describe('GmailAddonAuth', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -13,7 +16,6 @@ describe('GmailAddonAuth', () => {
   describe('generateToken', () => {
     it('should generate a valid JWT token', () => {
       const mockSign = jest.fn().mockReturnValue('mock-token');
-      const jwt = require('jsonwebtoken');
       jwt.sign = mockSign;
 
       const token = GmailAddonAuth.generateToken('user-id', 'test@example.com');
@@ -66,7 +68,6 @@ describe('GmailAddonAuth', () => {
         }),
       });
 
-      const jwt = require('jsonwebtoken');
       jwt.verify = mockVerify;
 
       const { createClient } = await import('@/utils/supabase/server');
@@ -109,7 +110,6 @@ describe('GmailAddonAuth', () => {
         throw new Error('Invalid token');
       });
 
-      const jwt = require('jsonwebtoken');
       jwt.verify = mockVerify;
 
       const result = await GmailAddonAuth.validateRequest(mockRequest);
@@ -137,7 +137,6 @@ describe('GmailAddonAuth', () => {
         exp: Math.floor(Date.now() / 1000) + 3600,
       });
 
-      const jwt = require('jsonwebtoken');
       jwt.verify = mockVerify;
 
       const result = await GmailAddonAuth.validateRequest(mockRequest);

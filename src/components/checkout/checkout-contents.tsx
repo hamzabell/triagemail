@@ -31,7 +31,7 @@ export function CheckoutContents({ userEmail }: Props) {
     throttle((paddle: Paddle, priceId: string, quantity: number) => {
       paddle.Checkout.updateItems([{ priceId, quantity }]);
     }, 1000),
-    [],
+    [throttle],
   );
 
   useEffect(() => {
