@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const userEmail = 'akandev888@gmail.com';
 const addonId = 'triagemail-addon';
 const secretKey = 'your-secret-key';
-const apiUrl = 'https://triage-mail.netlify.app/api/auth/gmail-addon/validate';
+const apiUrl = 'http://localhost:3001/api/auth/gmail-addon/validate';
 
 // Generate timestamp and signature
 function createSignature(email, timestamp, secretKey) {

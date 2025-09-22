@@ -20,24 +20,12 @@ export async function validateGmailAddonRequest(request: NextRequest): Promise<N
       );
     }
 
-    // Check rate limits
-    const rateLimitOk = await GmailAddonAuth.checkRateLimit(validationResult.user?.id || '');
-    if (!rateLimitOk) {
-      return NextResponse.json(
-        {
-          error: 'Rate limit exceeded. Please try again later.',
-          code: 'RATE_LIMIT_EXCEEDED',
-        },
-        { status: 429 },
-      );
-    }
+    // Skip rate limiting for now - can be added later with proper user tracking
 
     // Add user info to request headers for downstream use
     const headers = new Headers(request.headers);
     headers.set('X-User-ID', validationResult.user?.id || '');
     headers.set('X-User-Email', validationResult.user?.email || '');
-    headers.set('X-Subscription-Status', validationResult.subscription?.status || '');
-    headers.set('X-Subscription-ID', validationResult.subscription?.id || '');
 
     // Return null to indicate validation passed
     return null;
