@@ -6,8 +6,13 @@
  */
 
 // API Configuration
-const API_BASE_URL = 'https://triage-mail.netlify.app/api'; // Replace with your actual backend URL
 const ADDON_ID = 'triagemail-addon'; // Unique add-on identifier
+
+// Get API URL from properties or use default
+function getApiBaseUrl() {
+  const properties = PropertiesService.getScriptProperties();
+  return properties.getProperty('API_BASE_URL') || 'https://triage-mail.netlify.app/api';
+}
 
 // Cache for storing classifications and responses
 const CACHE_EXPIRATION = 5 * 60 * 1000; // 5 minutes
@@ -35,9 +40,9 @@ class AuthManager {
    */
   refreshAuthentication() {
     try {
-      const userEmail = Session.getActiveUser().getEmail();
+      const userEmail = this.getUserEmailSafely();
 
-      const url = API_BASE_URL + '/auth/gmail-addon/validate';
+      const url = getApiBaseUrl() + '/auth/gmail-addon/validate';
 
       const options = {
         method: 'post',
@@ -68,13 +73,36 @@ class AuthManager {
    * Get simplified authentication headers
    */
   getAuthHeaders() {
-    const userEmail = Session.getActiveUser().getEmail();
+    try {
+      const userEmail = this.getUserEmailSafely();
 
-    return {
-      'X-Gmail-User-Email': userEmail,
-      'X-Gmail-Addon-ID': ADDON_ID,
-      'Content-Type': 'application/json',
-    };
+      return {
+        'X-Gmail-User-Email': userEmail,
+        'X-Gmail-Addon-ID': ADDON_ID,
+        'Content-Type': 'application/json',
+      };
+    } catch (error) {
+      Logger.log('Error getting auth headers: ' + error.toString());
+      // Return fallback headers that will trigger authentication error
+      return {
+        'X-Gmail-User-Email': 'error@example.com',
+        'X-Gmail-Addon-ID': ADDON_ID,
+        'Content-Type': 'application/json',
+      };
+    }
+  }
+
+  /**
+   * Get user email safely with proper error handling
+   */
+  getUserEmailSafely() {
+    try {
+      return Session.getActiveUser().getEmail();
+    } catch (error) {
+      Logger.log('Error getting user email: ' + error.toString());
+      // Return a safe fallback that will be rejected by backend validation
+      return 'no-permission@example.com';
+    }
   }
 }
 
@@ -200,7 +228,7 @@ function createHomepageCard() {
     .addWidget(
       CardService.newTextButton()
         .setText('View Dashboard')
-        .setOpenLink(CardService.newOpenLink().setUrl(API_BASE_URL.replace('/api', '/dashboard')))
+        .setOpenLink(CardService.newOpenLink().setUrl(getApiBaseUrl().replace('/api', '/dashboard')))
         .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
         .setBackgroundColor('#FF3366'),
     )
@@ -248,7 +276,7 @@ function createHomepageCard() {
     .addWidget(
       CardService.newTextButton()
         .setText('🔍 Analyze Recent (5)')
-        .setOnClickAction(CardService.newAction().setFunctionName('analyzeRecentEmails').setParameters({ count: 5 }))
+        .setOnClickAction(CardService.newAction().setFunctionName('analyzeRecentEmails').setParameters({ count: '5' }))
         .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
         .setBackgroundColor('#E9C46A'),
     )
@@ -690,7 +718,7 @@ function processPredefinedPrompt(emailData, promptId) {
   try {
     validateAuthentication();
 
-    const url = API_BASE_URL + '/email/prompt';
+    const url = getApiBaseUrl() + '/email/prompt';
     const payload = {
       emailId: emailData.emailId,
       promptId: promptId,
@@ -850,7 +878,7 @@ function classifyEmail(emailData) {
   try {
     validateAuthentication();
 
-    const url = API_BASE_URL + '/email/classify';
+    const url = getApiBaseUrl() + '/email/classify';
     const payload = {
       subject: emailData.subject,
       body: emailData.body,
@@ -894,7 +922,7 @@ function classifyEmail(emailData) {
  */
 function generateResponse(emailData, classification, tone = 'professional') {
   try {
-    const url = API_BASE_URL + '/email/respond';
+    const url = getApiBaseUrl() + '/email/respond';
     const payload = {
       subject: emailData.subject,
       body: emailData.body,
@@ -1021,7 +1049,7 @@ function submitFeedback(e) {
   try {
     validateAuthentication();
 
-    const url = API_BASE_URL + '/email/feedback';
+    const url = getApiBaseUrl() + '/email/feedback';
     const payload = {
       responseId: messageId,
       rating: parseInt(rating),
@@ -1067,7 +1095,7 @@ function generateComposeResponse(e) {
     try {
       userEmail = Session.getActiveUser().getEmail();
     } catch (userError) {
-      userEmail = 'user@example.com'; // Fallback email
+      userEmail = 'no-permission@example.com'; // Safe fallback that will fail validation
     }
 
     const emailData = {
@@ -1109,7 +1137,7 @@ function generateNewResponse(e) {
     try {
       userEmail = Session.getActiveUser().getEmail();
     } catch (userError) {
-      userEmail = 'user@example.com'; // Fallback email
+      userEmail = 'no-permission@example.com'; // Safe fallback that will fail validation
     }
 
     const emailData = {
@@ -1211,7 +1239,7 @@ function processFollowUpQuestion(authManager, messageId, question) {
   try {
     validateAuthentication();
 
-    const url = `${API_BASE_URL}/email/follow-up`;
+    const url = `${getApiBaseUrl()}/email/follow-up`;
 
     const payload = {
       messageId: messageId,
@@ -1248,7 +1276,7 @@ function processSuggestedAction(authManager, messageId, action) {
   try {
     validateAuthentication();
 
-    const url = `${API_BASE_URL}/email/action`;
+    const url = `${getApiBaseUrl()}/email/action`;
 
     const payload = {
       messageId: messageId,
@@ -1285,7 +1313,7 @@ function generateComposeEmailResponse(authManager, emailData, tone) {
   try {
     validateAuthentication();
 
-    const url = `${API_BASE_URL}/email/generate-response`;
+    const url = `${getApiBaseUrl()}/email/generate-response`;
 
     const payload = {
       subject: emailData.subject,
@@ -1325,7 +1353,7 @@ function fetchUserStats(authManager) {
   try {
     validateAuthentication();
 
-    const url = `${API_BASE_URL}/dashboard/stats`;
+    const url = `${getApiBaseUrl()}/dashboard/stats`;
     const headers = authManager.getAuthHeaders();
 
     const response = UrlFetchApp.fetch(url, {
@@ -1440,7 +1468,7 @@ function classifyCurrentEmail(e) {
     try {
       userEmail = Session.getActiveUser().getEmail();
     } catch (userError) {
-      userEmail = 'user@example.com'; // Fallback email
+      userEmail = 'no-permission@example.com'; // Safe fallback that will fail validation
     }
 
     const emailData = {
@@ -1476,7 +1504,7 @@ function generateResponseForCurrent(e) {
     try {
       userEmail = Session.getActiveUser().getEmail();
     } catch (userError) {
-      userEmail = 'user@example.com'; // Fallback email
+      userEmail = 'no-permission@example.com'; // Safe fallback that will fail validation
     }
 
     const emailData = {
@@ -1508,7 +1536,11 @@ function generateResponseForCurrent(e) {
  */
 function showFocusMode() {
   try {
-    const authManager = new AuthManager();
+    // Ensure authManager is available
+    if (!authManager) {
+      throw new Error('Authentication manager not available');
+    }
+
     const focusData = fetchFocusModeData(authManager);
 
     // Create a simple focus mode card
@@ -1565,7 +1597,7 @@ function analyzeRecentEmails(e) {
     try {
       userEmail = Session.getActiveUser().getEmail();
     } catch (userError) {
-      userEmail = 'user@example.com'; // Fallback email
+      userEmail = 'no-permission@example.com'; // Safe fallback that will fail validation
     }
 
     threads.forEach((thread) => {
@@ -1663,7 +1695,7 @@ function runQuickPrompt(e) {
     try {
       userEmail = Session.getActiveUser().getEmail();
     } catch (userError) {
-      userEmail = 'user@example.com'; // Fallback email
+      userEmail = 'no-permission@example.com'; // Safe fallback that will fail validation
     }
 
     const emailData = {
@@ -1695,9 +1727,14 @@ function runQuickPrompt(e) {
  */
 function fetchFocusModeData(authManager) {
   try {
+    // Ensure authManager is available
+    if (!authManager) {
+      throw new Error('Authentication manager not available');
+    }
+
     validateAuthentication();
 
-    const url = `${API_BASE_URL}/dashboard/focus`;
+    const url = `${getApiBaseUrl()}/dashboard/focus`;
     const headers = authManager.getAuthHeaders();
 
     const response = UrlFetchApp.fetch(url, {

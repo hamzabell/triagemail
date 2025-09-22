@@ -1,16 +1,19 @@
-// Test configuration
+// Test the local prompt processing endpoint
 const userEmail = 'akandev888@gmail.com';
 const addonId = 'triagemail-addon';
-const apiUrl = 'https://triage-mail.netlify.app/api/auth/gmail-addon/validate';
+const apiUrl = 'http://localhost:3000/api/email/prompt';
 
-async function testAuthentication() {
-  console.log('Testing simplified authentication...');
+async function testPromptProcessing() {
+  console.log('Testing LOCAL prompt processing endpoint...');
   console.log('Email:', userEmail);
   console.log('Addon ID:', addonId);
 
   const payload = {
-    test: true,
-    email: userEmail,
+    emailId: 'test-email-123',
+    promptId: 'summarize_key_points',
+    subject: 'Test Email Subject',
+    body: 'This is a test email body with some important information that needs to be summarized.',
+    from: 'test@example.com',
   };
 
   const headers = {
@@ -43,4 +46,4 @@ async function testAuthentication() {
   }
 }
 
-testAuthentication();
+testPromptProcessing();

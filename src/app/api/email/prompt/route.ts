@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
+import { GmailAddonAuth } from '@/lib/gmail-auth';
 import { supabase } from '@/lib/db';
 import { aiService } from '@/lib/ai';
-import { withGmailAddonValidation, getGmailAddonUserInfo } from '@/lib/gmail-validation-middleware';
 
 interface PromptRequest {
   emailId: string;
@@ -12,27 +11,26 @@ interface PromptRequest {
   from?: string;
 }
 
-// Wrap the handler with Gmail add-on validation
-export const POST = withGmailAddonValidation(async (request: NextRequest) => {
+export async function POST(request: NextRequest) {
   try {
-    // Get user info from validated request
-    const userInfo = getGmailAddonUserInfo(request);
-    let user;
+    // Validate Gmail add-on authentication
+    const validationResult = await GmailAddonAuth.validateRequest(request);
 
-    if (userInfo) {
-      // Gmail add-on authenticated user
-      user = {
-        id: userInfo.userId,
-        email: userInfo.userEmail,
-      };
-    } else {
-      // Regular authenticated user
-      const authUser = await requireAuth();
-      if (authUser instanceof NextResponse) {
-        return authUser;
-      }
-      user = authUser;
+    if (!validationResult.valid) {
+      return NextResponse.json(
+        {
+          error: validationResult.error || 'Authentication failed',
+          code: 'AUTHENTICATION_FAILED',
+        },
+        { status: 401 },
+      );
     }
+
+    // Use Gmail add-on user info
+    const user = {
+      id: validationResult.user?.id || 'unknown',
+      email: validationResult.user?.email || 'unknown@example.com',
+    };
 
     const { emailId, promptId, subject, body, from }: PromptRequest = await request.json();
 
@@ -81,4 +79,4 @@ export const POST = withGmailAddonValidation(async (request: NextRequest) => {
     console.error('Prompt processing error:', error);
     return NextResponse.json({ error: 'Failed to process prompt' }, { status: 500 });
   }
-});
+}
