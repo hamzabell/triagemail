@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import jwt from 'jsonwebtoken';
 import * as crypto from 'crypto';
 
 export interface GmailAddonValidationResult {
@@ -23,80 +22,40 @@ export interface GmailAddonValidationResult {
 export interface GmailAddonHeaders {
   'X-Gmail-User-Email': string;
   'X-Gmail-Addon-ID': string;
-  Authorization: string;
   'X-Request-Timestamp': string;
   'X-Request-Signature': string;
 }
 
 export class GmailAddonAuth {
-  private static readonly JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
   private static readonly ADDON_ID = process.env.GMAIL_ADDON_ID || 'triagemail-addon';
-  private static readonly API_KEY = process.env.GMAIL_ADDON_API_KEY || 'your-api-key';
+  private static readonly SECRET_KEY = process.env.GMAIL_ADDON_SECRET || 'your-secret-key';
 
   /**
-   * Generate JWT token for Gmail add-on authentication
-   */
-  static generateToken(userId: string, userEmail: string): string {
-    const payload = {
-      sub: userId,
-      email: userEmail,
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 60 * 60, // 1 hour expiration
-      iss: 'triagemail-app',
-      aud: 'triagemail-api',
-      addon_id: this.ADDON_ID,
-      scope: 'gmail.addon.execute',
-    };
-
-    return jwt.sign(payload, this.JWT_SECRET);
-  }
-
-  /**
-   * Validate JWT token from Gmail add-on request
-   */
-  static validateToken(token: string): { userId: string; email: string } {
-    try {
-      const decoded = jwt.verify(token, this.JWT_SECRET);
-      if (typeof decoded === 'string') {
-        throw new Error('Invalid JWT token format');
-      }
-      return decoded as { userId: string; email: string };
-    } catch (_error) {
-      throw new Error('Invalid JWT token');
-    }
-  }
-
-  /**
-   * Validate Gmail add-on request headers and authentication
+   * Validate Gmail add-on request using email-based authentication
    */
   static async validateRequest(request: NextRequest): Promise<GmailAddonValidationResult> {
     try {
       // Extract required headers
-      const authHeader = request.headers.get('Authorization');
       const userEmail = request.headers.get('X-Gmail-User-Email');
       const addonId = request.headers.get('X-Gmail-Addon-ID');
       const timestamp = request.headers.get('X-Request-Timestamp');
       const signature = request.headers.get('X-Request-Signature');
 
       // Validate required headers
-      if (!authHeader || !userEmail || !addonId || !timestamp || !signature) {
+      if (!userEmail || !addonId || !timestamp || !signature) {
         return {
           valid: false,
           error: 'Missing required headers',
         };
       }
 
-      // Validate Authorization header format
-      if (!authHeader.startsWith('Bearer ')) {
+      // Validate email format
+      if (!this.isValidGmailEmail(userEmail)) {
         return {
           valid: false,
-          error: 'Invalid authorization header format',
+          error: 'Invalid Gmail email format',
         };
       }
-
-      // Extract and validate JWT token
-      const token = authHeader.substring(7);
-      const decodedToken = this.validateToken(token);
 
       // Validate add-on ID
       if (addonId !== this.ADDON_ID) {
@@ -116,34 +75,34 @@ export class GmailAddonAuth {
         };
       }
 
-      // Validate email matches token
-      if (decodedToken.email !== userEmail) {
+      // Verify request signature
+      if (!this.verifySignature(userEmail, timestamp, signature)) {
         return {
           valid: false,
-          error: 'Email mismatch in headers and token',
+          error: 'Invalid request signature',
         };
       }
 
       // Initialize Supabase client
       const supabase = await createClient();
 
-      // Get user from Supabase auth
+      // Get user from Supabase auth using email
       const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser(token);
-      if (authError || !user) {
+        data: { users },
+        error: listError,
+      } = await supabase.auth.admin.listUsers();
+      if (listError) {
         return {
           valid: false,
-          error: 'Invalid user authentication',
+          error: 'Failed to retrieve users',
         };
       }
 
-      // Verify email matches authenticated user
-      if (user.email !== userEmail) {
+      const user = users.find((u) => u.email === userEmail);
+      if (!user) {
         return {
           valid: false,
-          error: 'Email mismatch with authenticated user',
+          error: 'User not found',
         };
       }
 
@@ -177,6 +136,14 @@ export class GmailAddonAuth {
         };
       }
 
+      // Check rate limits
+      if (!(await this.checkRateLimit(user.id))) {
+        return {
+          valid: false,
+          error: 'Rate limit exceeded',
+        };
+      }
+
       return {
         valid: true,
         user: {
@@ -193,6 +160,30 @@ export class GmailAddonAuth {
         error: `Authentication validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       };
     }
+  }
+
+  /**
+   * Validate Gmail email format
+   */
+  private static isValidGmailEmail(email: string): boolean {
+    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
+    return gmailRegex.test(email);
+  }
+
+  /**
+   * Create request signature for email-based authentication
+   */
+  static createSignature(email: string, timestamp: string): string {
+    const data = `${email}.${timestamp}.${this.SECRET_KEY}`;
+    return crypto.createHmac('sha256', this.SECRET_KEY).update(data).digest('hex');
+  }
+
+  /**
+   * Verify request signature
+   */
+  static verifySignature(email: string, timestamp: string, signature: string): boolean {
+    const expectedSignature = this.createSignature(email, timestamp);
+    return signature === expectedSignature;
   }
 
   /**
@@ -234,25 +225,9 @@ export class GmailAddonAuth {
   }
 
   /**
-   * Validate API key for additional security
+   * Generate timestamp for request signature
    */
-  static validateAPIKey(apiKey: string): boolean {
-    return apiKey === this.API_KEY;
-  }
-
-  /**
-   * Create request signature for additional security
-   */
-  static createSignature(payload: string, timestamp: string): string {
-    const data = `${payload}.${timestamp}.${this.API_KEY}`;
-    return crypto.createHmac('sha256', this.JWT_SECRET).update(data).digest('hex');
-  }
-
-  /**
-   * Verify request signature
-   */
-  static verifySignature(payload: string, timestamp: string, signature: string): boolean {
-    const expectedSignature = this.createSignature(payload, timestamp);
-    return signature === expectedSignature;
+  static generateTimestamp(): string {
+    return Math.floor(Date.now() / 1000).toString();
   }
 }

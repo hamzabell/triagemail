@@ -2,127 +2,100 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GmailAddonAuth } from '@/lib/gmail-auth';
 
 /**
- * Endpoint to validate Gmail add-on authentication and generate tokens
+ * Endpoint to validate Gmail add-on authentication using email-based validation
  * This endpoint is used by the Gmail add-on to authenticate users
  */
 export async function POST(request: NextRequest) {
   try {
-    const { email, apiKey } = await request.json();
+    // Validate the request using email-based authentication
+    const validationResult = await GmailAddonAuth.validateRequest(request);
 
-    // Validate required parameters
-    if (!email || !apiKey) {
+    if (!validationResult.valid) {
       return NextResponse.json(
         {
-          error: 'Email and API key are required',
-          code: 'MISSING_PARAMS',
-        },
-        { status: 400 },
-      );
-    }
-
-    // Validate API key
-    if (!GmailAddonAuth.validateAPIKey(apiKey)) {
-      return NextResponse.json(
-        {
-          error: 'Invalid API key',
-          code: 'INVALID_API_KEY',
+          error: validationResult.error || 'Authentication failed',
+          code: 'AUTHENTICATION_FAILED',
         },
         { status: 401 },
       );
     }
 
-    // Initialize Supabase client
-    const { createClient } = await import('@/utils/supabase/server');
-    const supabase = await createClient();
-
-    // Find user by email
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.admin.getUserById(
-      (await supabase.auth.admin.listUsers()).data.users.find((u) => u.email === email)?.id || '',
-    );
-
-    if (userError || !user) {
-      return NextResponse.json(
-        {
-          error: 'User not found',
-          code: 'USER_NOT_FOUND',
-        },
-        { status: 404 },
-      );
+    // Log the successful request
+    if (validationResult.user) {
+      await GmailAddonAuth.logRequest(validationResult.user.id, '/api/auth/gmail-addon/validate', true);
     }
 
-    // Check if user email is confirmed
-    if (!user.email_confirmed_at) {
-      return NextResponse.json(
-        {
-          error: 'Email not confirmed',
-          code: 'EMAIL_NOT_CONFIRMED',
-        },
-        { status: 403 },
-      );
-    }
-
-    // Check user subscription status
-    const { data: subscription, error: subscriptionError } = await supabase
-      .from('subscriptions')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
-
-    if (subscriptionError || !subscription) {
-      return NextResponse.json(
-        {
-          error: 'No subscription found',
-          code: 'NO_SUBSCRIPTION',
-        },
-        { status: 404 },
-      );
-    }
-
-    // Check if subscription is active
-    if (subscription.status !== 'active') {
-      return NextResponse.json(
-        {
-          error: 'Subscription is not active',
-          code: 'SUBSCRIPTION_INACTIVE',
-        },
-        { status: 403 },
-      );
-    }
-
-    // Check if subscription has expired
-    if (subscription.current_period_end && new Date(subscription.current_period_end) < new Date()) {
-      return NextResponse.json(
-        {
-          error: 'Subscription has expired',
-          code: 'SUBSCRIPTION_EXPIRED',
-        },
-        { status: 403 },
-      );
-    }
-
-    // Generate JWT token
-    const token = GmailAddonAuth.generateToken(user.id, user.email || '');
-
-    // Return validation response
+    // Return validation response with user info
     return NextResponse.json({
       success: true,
-      token,
       user: {
-        id: user.id,
-        email: user.email,
-        subscription: {
-          id: subscription.id,
-          status: subscription.status,
-          current_period_end: subscription.current_period_end,
-        },
+        id: validationResult.user?.id,
+        email: validationResult.user?.email,
+        name: validationResult.user?.name,
+        subscription: validationResult.subscription
+          ? {
+              id: validationResult.subscription.id,
+              status: validationResult.subscription.status,
+              plan_id: validationResult.subscription.plan_id,
+              current_period_end: validationResult.subscription.current_period_end,
+            }
+          : undefined,
       },
-      expires_at: Math.floor(Date.now() / 1000) + 60 * 60, // 1 hour
+      timestamp: GmailAddonAuth.generateTimestamp(),
     });
   } catch (error) {
     console.error('Gmail add-on validation error:', error);
+    return NextResponse.json(
+      {
+        error: 'Internal server error',
+        code: 'INTERNAL_ERROR',
+      },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * Generate a signature for the Gmail add-on client
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const email = request.nextUrl.searchParams.get('email');
+
+    if (!email) {
+      return NextResponse.json(
+        {
+          error: 'Email parameter is required',
+          code: 'MISSING_EMAIL',
+        },
+        { status: 400 },
+      );
+    }
+
+    // Validate Gmail email format
+    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
+    if (!gmailRegex.test(email)) {
+      return NextResponse.json(
+        {
+          error: 'Invalid Gmail email format',
+          code: 'INVALID_EMAIL_FORMAT',
+        },
+        { status: 400 },
+      );
+    }
+
+    // Generate timestamp and signature for client-side use
+    const timestamp = GmailAddonAuth.generateTimestamp();
+    const signature = GmailAddonAuth.createSignature(email, timestamp);
+
+    return NextResponse.json({
+      email,
+      timestamp,
+      signature,
+      addon_id: process.env.GMAIL_ADDON_ID || 'triagemail-addon',
+    });
+  } catch (error) {
+    console.error('Gmail add-on signature generation error:', error);
     return NextResponse.json(
       {
         error: 'Internal server error',
