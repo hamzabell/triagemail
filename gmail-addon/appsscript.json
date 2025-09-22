@@ -1,40 +1,18 @@
 {
   "timeZone": "America/New_York",
-  "dependencies": {
-    "enabledAdvancedServices": [
-      {
-        "userSymbol": "Gmail",
-        "version": "v1",
-        "serviceId": "gmail"
-      },
-      {
-        "userSymbol": "UrlFetchApp",
-        "serviceId": "urlfetch"
-      }
-    ],
-    "libraries": [
-      {
-        "userSymbol": "OAuth2",
-        "libraryId": "1B7FSrk5Zi6L1rSxxTDgDEUsPzlU_DGEi_mP4w1aGhMF9tY5Xq_L2Hn48",
-        "version": "42"
-      }
-    ]
-  },
-  "exceptionLogging": "STACKDRIVER",
   "runtimeVersion": "V8",
   "oauthScopes": [
     "https://www.googleapis.com/auth/gmail.addons.current.message.readonly",
-    "https://www.googleapis.com/auth/gmail.addons.current.action.compose",
     "https://www.googleapis.com/auth/gmail.addons.execute",
-    "https://www.googleapis.com/auth/script.external_request",
-    "https://www.googleapis.com/auth/gmail.labels",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/gmail.modify"
   ],
   "gmail": {
     "name": "TriageMail",
-    "logoUrl": "https://example.com/logo.png",
+    "logoUrl": "https://www.gstatic.com/images/branding/product/1x/gmail_48dp.png",
     "primaryColor": "#FF3366",
-    "secondaryColor": "#F1FAEE",
     "homepageTrigger": {
       "runFunction": "onGmailHomepage"
     },
@@ -43,14 +21,6 @@
         "unconditional": {},
         "onTriggerFunction": "onGmailMessageOpen"
       }
-    ],
-    "composeTrigger": {
-      "selectActions": [
-        {
-          "text": "Generate TriageMail Response",
-          "runFunction": "onComposeTrigger"
-        }
-      ]
-    }
+    ]
   }
 }

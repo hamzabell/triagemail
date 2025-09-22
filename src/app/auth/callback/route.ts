@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { autoRegisterGmailAccount } from '@/lib/gmail-auto-register';
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -35,6 +36,16 @@ export async function GET(request: Request) {
       const isNewUser = timeSinceConfirmation < 300000; // 5 minutes
 
       if (isNewUser) {
+        // Auto-register Gmail account if applicable
+        if (data.user.email && data.user.email.endsWith('@gmail.com')) {
+          const autoRegisterResult = await autoRegisterGmailAccount(data.user.id, data.user.email);
+          if (autoRegisterResult.success) {
+            console.log('Gmail account auto-registered for:', data.user.email);
+          } else {
+            console.warn('Failed to auto-register Gmail account:', autoRegisterResult.error);
+          }
+        }
+
         return NextResponse.redirect(`${origin}/verify-email?success=true&verified=true`);
       }
     }

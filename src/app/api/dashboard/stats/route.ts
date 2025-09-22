@@ -3,18 +3,50 @@ import { requireAuth } from '@/lib/auth';
 import { supabase } from '@/lib/db';
 
 export async function GET() {
-  const user = await requireAuth();
+  const authUser = await requireAuth();
 
-  if (user instanceof NextResponse) {
-    return user;
+  if (authUser instanceof NextResponse) {
+    return authUser;
   }
 
   try {
-    // Get user's classifications and analytics
+    const { data: dbUser, error: userError } = await supabase.from('users').select('*').eq('id', authUser.id).single();
+
+    if (userError) {
+      const { data: newUser, error: createError } = await supabase
+        .from('users')
+        .insert([
+          {
+            id: authUser.id,
+            email: authUser.email || '',
+            name: authUser.user_metadata?.name || '',
+            avatar: authUser.user_metadata?.avatar_url || '',
+          },
+        ])
+        .select()
+        .single();
+
+      if (createError && createError.code !== '23505') {
+        console.error('Failed to create user:', createError);
+        return NextResponse.json({ error: 'Failed to create user profile' }, { status: 500 });
+      }
+    }
+
     const { data: classifications, error: classificationsError } = await supabase
       .from('classifications')
-      .select('*, response(*)')
-      .eq('user_id', user.id)
+      .select(
+        `
+        *,
+        responses (
+          id,
+          tone,
+          estimated_time,
+          rating,
+          content
+        )
+      `,
+      )
+      .eq('user_id', authUser.id)
       .order('processed_at', { ascending: false })
       .limit(100);
 
@@ -22,38 +54,62 @@ export async function GET() {
       throw classificationsError;
     }
 
-    // Get today's analytics
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const { data: todayAnalytics, error: analyticsError } = await supabase
       .from('analytics')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', authUser.id)
       .gte('date', today.toISOString())
       .single();
 
     if (analyticsError && analyticsError.code !== 'PGRST116') {
-      // PGRST116 = no rows returned
       throw analyticsError;
     }
 
-    // Calculate statistics
     const totalEmails = classifications?.length || 0;
-    const totalResponses = classifications?.filter((c) => c.response).length || 0;
+    const totalResponses = classifications?.filter((c) => c.responses).length || 0;
     const totalTimeSaved =
       classifications?.reduce((sum, c) => {
-        return sum + (c.response?.estimated_time || 0);
+        return sum + (c.responses?.estimated_time || 0);
       }, 0) || 0;
 
-    // Get accuracy rate (mock for now)
-    const accuracyRate = 87; // This would be calculated from user feedback
+    // Calculate accuracy rate from actual response ratings
+    const ratedResponses = classifications?.filter((c) => c.responses?.rating !== null) || [];
+    const accuracyRate =
+      ratedResponses.length > 0
+        ? Math.round(
+            (ratedResponses.reduce((sum, c) => sum + (c.responses?.rating || 0), 0) / ratedResponses.length) * 20,
+          ) // Convert 1-5 scale to percentage
+        : 87;
+
+    // Calculate this month's stats
+    const thisMonth = new Date();
+    thisMonth.setDate(1);
+    thisMonth.setHours(0, 0, 0, 0);
+
+    const { data: monthlyAnalytics, error: monthlyError } = await supabase
+      .from('analytics')
+      .select('*')
+      .eq('user_id', authUser.id)
+      .gte('date', thisMonth.toISOString());
+
+    const monthlyEmails = monthlyAnalytics?.reduce((sum, a) => sum + (a.emails_processed || 0), 0) || 0;
+    const monthlyResponses = monthlyAnalytics?.reduce((sum, a) => sum + (a.responses_used || 0), 0) || 0;
+    const monthlyTimeSaved = monthlyAnalytics?.reduce((sum, a) => sum + (a.time_saved || 0), 0) || 0;
 
     return NextResponse.json({
       emailsProcessed: totalEmails,
       responsesGenerated: totalResponses,
-      timeSaved: Math.round((totalTimeSaved / 60) * 10) / 10, // Convert to hours
+      timeSaved: Math.round((totalTimeSaved / 60) * 10) / 10,
       accuracy: accuracyRate,
+      monthlyStats: {
+        emailsProcessed: monthlyEmails,
+        responsesGenerated: monthlyResponses,
+        timeSaved: Math.round((monthlyTimeSaved / 60) * 10) / 10,
+        accuracy: accuracyRate,
+      },
       todayStats: todayAnalytics || {
         emailsProcessed: 0,
         responsesUsed: 0,

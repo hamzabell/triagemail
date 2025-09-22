@@ -199,7 +199,29 @@ The system uses Supabase Auth with:
 
 ## Deployment
 
-### Vercel Deployment
+### Deployment Options
+
+#### Option 1: Netlify Deployment (Recommended)
+
+1. **Deploy to Netlify**
+   See [NETLIFY_DEPLOYMENT.md](./NETLIFY_DEPLOYMENT.md) for detailed instructions
+
+2. **Quick Start**
+
+   ```bash
+   # Install Netlify CLI
+   npm install -g netlify-cli
+
+   # Deploy to Netlify
+   netlify deploy --prod
+   ```
+
+3. **Configure Environment Variables**
+   - Add all required environment variables to Netlify
+   - Configure build and runtime variables
+   - Set up webhook endpoints
+
+#### Option 2: Vercel Deployment
 
 1. **Deploy to Vercel**
 
@@ -234,28 +256,55 @@ For production deployment:
    - Update pricing constants in `src/constants/pricing-tier.ts`
 
 3. **Domain Configuration**
-   - Configure your custom domain in Vercel
+   - Configure your custom domain
    - Set up SSL certificates
    - Update Paddle with your production domain
 
 ## Testing
 
-### Unit Tests
+### Comprehensive Testing Plan
+
+For detailed testing instructions, see [TESTING_PLAN.md](./TESTING_PLAN.md).
+
+### Quick Test Commands
+
+#### Unit Tests
 
 ```bash
 npm run test
 ```
 
-### Integration Tests
+#### Integration Tests
 
 ```bash
 npm run test:integration
 ```
 
-### End-to-End Tests
+#### End-to-End Tests
 
 ```bash
 npm run test:e2e
+```
+
+#### Gmail Add-on Tests
+
+```bash
+# Test Gmail add-on integration
+npm run test:gmail
+```
+
+#### Performance Tests
+
+```bash
+# Run load testing
+npm run test:performance
+```
+
+#### Security Tests
+
+```bash
+# Run security vulnerability scans
+npm run test:security
 ```
 
 ### Build Validation
@@ -265,6 +314,35 @@ npm run build
 npm run lint
 npm run type-check
 ```
+
+### Testing Coverage
+
+- **Unit Tests**: 90%+ coverage for core functions
+- **Integration Tests**: 80%+ coverage for API endpoints
+- **E2E Tests**: Complete user workflows
+- **Security Tests**: OWASP Top 10 coverage
+- **Performance Tests**: Load testing up to 1000 concurrent users
+
+### Test Environment Setup
+
+1. **Local Testing**
+
+   ```bash
+   # Copy test environment
+   cp .env.local.example .env.test
+
+   # Install test dependencies
+   npm install
+   ```
+
+2. **Gmail Integration Testing**
+   See [GMAIL_ADDON_TESTING_STRATEGIES.md](./gmail-addon/GMAIL_ADDON_TESTING_STRATEGIES.md) for comprehensive Gmail testing procedures.
+
+3. **Production Testing**
+   - Test deployment environment
+   - Verify all API endpoints
+   - Test Gmail add-on integration
+   - Validate payment processing
 
 ## Security Considerations
 

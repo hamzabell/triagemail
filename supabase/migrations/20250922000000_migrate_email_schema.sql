@@ -47,6 +47,16 @@ create table
     confidence real not null check (confidence >= 0 and confidence <= 1),
     processed_at timestamp with time zone not null default now(),
 
+    -- Enhanced fields for core differentiation
+    business_priority integer not null default 5 check (business_priority >= 1 and business_priority <= 10),
+    action_items text default '[]'::jsonb, -- JSON array of action items
+    deadlines text default '[]'::jsonb, -- JSON array of deadlines
+    business_context text default '{}'::jsonb, -- JSON object with business context
+    quick_actions text default '[]'::jsonb, -- JSON array of quick actions
+    follow_up_required boolean not null default false,
+    response_complexity text not null default 'moderate' check (response_complexity in ('simple', 'moderate', 'complex')),
+    estimated_time integer not null default 5,
+
     constraint classifications_user_id_fkey foreign key (user_id) references users (id) on delete cascade,
     constraint classifications_email_id_unique unique (email_id)
   ) tablespace pg_default;
@@ -225,6 +235,39 @@ create trigger on_auth_user_email_updated
   when (old.email is distinct from new.email)
   execute procedure public.handle_user_email_update();
 
+-- Create API requests table for rate limiting and analytics
+create table
+  public.api_requests (
+    id uuid not null default gen_random_uuid() primary key,
+    user_id uuid not null,
+    endpoint text not null,
+    success boolean not null default true,
+    created_at timestamp with time zone not null default now(),
+
+    constraint api_requests_user_id_fkey foreign key (user_id) references users (id) on delete cascade
+  ) tablespace pg_default;
+
+-- Create policies for api_requests table
+create policy "Users can view own api requests" on public.api_requests for select using (auth.uid() = user_id);
+create policy "Users can insert own api requests" on public.api_requests for insert with check (auth.uid() = user_id);
+
+-- Create prompt usage table for analytics and improvement
+create table
+  public.prompt_usage (
+    id uuid not null default gen_random_uuid() primary key,
+    user_id uuid not null,
+    email_id text not null,
+    prompt_id text not null,
+    confidence real not null,
+    created_at timestamp with time zone not null default now(),
+
+    constraint prompt_usage_user_id_fkey foreign key (user_id) references users (id) on delete cascade
+  ) tablespace pg_default;
+
+-- Create policies for prompt_usage table
+create policy "Users can view own prompt usage" on public.prompt_usage for select using (auth.uid() = user_id);
+create policy "Users can insert own prompt usage" on public.prompt_usage for insert with check (auth.uid() = user_id);
+
 -- Create indexes for better performance
 create index idx_classifications_user_id on public.classifications (user_id);
 create index idx_classifications_email_id on public.classifications (email_id);
@@ -244,3 +287,11 @@ create index idx_subscriptions_customer_id on public.subscriptions (customer_id)
 create index idx_subscriptions_status on public.subscriptions (subscription_status);
 
 create index idx_customers_email on public.customers (email);
+
+create index idx_api_requests_user_id on public.api_requests (user_id);
+create index idx_api_requests_created_at on public.api_requests (created_at);
+create index idx_api_requests_endpoint on public.api_requests (endpoint);
+
+create index idx_prompt_usage_user_id on public.prompt_usage (user_id);
+create index idx_prompt_usage_prompt_id on public.prompt_usage (prompt_id);
+create index idx_prompt_usage_created_at on public.prompt_usage (created_at);

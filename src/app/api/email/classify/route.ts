@@ -2,12 +2,27 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { supabase } from '@/lib/db';
 import { aiService } from '@/lib/ai';
+import { withGmailAddonValidation, getGmailAddonUserInfo } from '@/lib/gmail-validation-middleware';
 
-export async function POST(request: NextRequest) {
-  const user = await requireAuth();
+// Wrap the handler with Gmail add-on validation
+export const POST = withGmailAddonValidation(async (request: NextRequest) => {
+  // Get user info from validated request (either from Gmail add-on or regular auth)
+  const userInfo = getGmailAddonUserInfo(request);
 
-  if (user instanceof NextResponse) {
-    return user;
+  let user;
+  if (userInfo) {
+    // Gmail add-on authenticated user
+    user = {
+      id: userInfo.userId,
+      email: userInfo.userEmail,
+    };
+  } else {
+    // Regular authenticated user
+    const authUser = await requireAuth();
+    if (authUser instanceof NextResponse) {
+      return authUser;
+    }
+    user = authUser;
   }
 
   try {
@@ -38,7 +53,7 @@ export async function POST(request: NextRequest) {
       emailId,
     });
 
-    // Save classification to database
+    // Save classification to database with enhanced analysis
     const { data: savedClassification, error: insertError } = await supabase
       .from('classifications')
       .insert([
@@ -53,6 +68,15 @@ export async function POST(request: NextRequest) {
           confidence: classification.confidence,
           keywords: JSON.stringify(classification.keywords),
           deadline: classification.deadline || null,
+          // Enhanced fields for core differentiation
+          business_priority: classification.businessPriority || classification.priority,
+          action_items: JSON.stringify(classification.actionItems || []),
+          deadlines: JSON.stringify(classification.deadlines || []),
+          business_context: JSON.stringify(classification.businessContext || {}),
+          quick_actions: JSON.stringify(classification.quickActions || []),
+          follow_up_required: classification.followUpRequired || false,
+          response_complexity: classification.responseComplexity || 'moderate',
+          estimated_time: classification.estimatedTime || 5,
         },
       ])
       .select()
@@ -118,12 +142,20 @@ export async function POST(request: NextRequest) {
         keywords: classification.keywords,
         deadline: savedClassification.deadline,
         suggestedResponse: savedResponse?.content || null,
-        estimatedTime: savedResponse?.estimated_time || 0,
+        estimatedTime: savedClassification.estimated_time || 0,
         processedAt: savedClassification.processed_at,
+        // Enhanced fields for core differentiation
+        businessPriority: savedClassification.business_priority,
+        actionItems: savedClassification.action_items ? JSON.parse(savedClassification.action_items) : [],
+        deadlines: savedClassification.deadlines ? JSON.parse(savedClassification.deadlines) : [],
+        businessContext: savedClassification.business_context ? JSON.parse(savedClassification.business_context) : {},
+        quickActions: savedClassification.quick_actions ? JSON.parse(savedClassification.quick_actions) : [],
+        followUpRequired: savedClassification.follow_up_required,
+        responseComplexity: savedClassification.response_complexity,
       },
     });
   } catch (error) {
     console.error('Email classification error:', error);
     return NextResponse.json({ error: 'Failed to classify email' }, { status: 500 });
   }
-}
+});

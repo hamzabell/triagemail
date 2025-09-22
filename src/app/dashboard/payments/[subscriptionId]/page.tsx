@@ -1,6 +1,5 @@
 'use client';
 
-import { DashboardPageHeader } from '@/components/dashboard/layout/dashboard-page-header';
 import { PaymentsContent } from '@/components/dashboard/payments/payments-content';
 import { LoadingScreen } from '@/components/dashboard/layout/loading-screen';
 import { Suspense } from 'react';
@@ -10,11 +9,14 @@ export default function SubscriptionsPaymentPage() {
   const { subscriptionId } = useParams<{ subscriptionId: string }>();
 
   return (
-    <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-8">
-      <DashboardPageHeader pageTitle={'Payments'} />
+    <div className="space-y-8">
+      <div className="mb-8">
+        <h1 className="font-heading text-4xl font-bold text-[#1D3557]">Payment Details</h1>
+        <p className="text-[#1D3557]/70">View and manage payment details for subscription</p>
+      </div>
       <Suspense fallback={<LoadingScreen />}>
         <PaymentsContent subscriptionId={subscriptionId} />
       </Suspense>
-    </main>
+    </div>
   );
 }
