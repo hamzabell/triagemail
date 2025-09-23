@@ -245,7 +245,34 @@ export class ClientHealthService {
         .eq('user_id', userId)
         .order('health_score', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error fetching client health scores:', error);
+        // Return default values instead of throwing
+        return {
+          scores: [],
+          analytics: {
+            totalContacts: 0,
+            averageHealthScore: 0,
+            criticalRelationships: 0,
+            improvingRelationships: 0,
+            decliningRelationships: 0,
+          },
+        };
+      }
+
+      // Handle case where no scores exist yet
+      if (!scores || scores.length === 0) {
+        return {
+          scores: [],
+          analytics: {
+            totalContacts: 0,
+            averageHealthScore: 0,
+            criticalRelationships: 0,
+            improvingRelationships: 0,
+            decliningRelationships: 0,
+          },
+        };
+      }
 
       const analytics = {
         totalContacts: scores.length,
@@ -258,7 +285,17 @@ export class ClientHealthService {
       return { scores, analytics };
     } catch (error) {
       console.error('Error getting client health scores:', error);
-      throw error;
+      // Return default values instead of throwing
+      return {
+        scores: [],
+        analytics: {
+          totalContacts: 0,
+          averageHealthScore: 0,
+          criticalRelationships: 0,
+          improvingRelationships: 0,
+          decliningRelationships: 0,
+        },
+      };
     }
   }
 
@@ -321,14 +358,22 @@ export class ClientHealthService {
         .order('priority_level', { ascending: false })
         .order('confidence_score', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error fetching recommendations:', error);
+        return [];
+      }
+
+      // Handle case where no recommendations exist
+      if (!recommendations || recommendations.length === 0) {
+        return [];
+      }
 
       // Filter out expired recommendations
       const now = new Date();
       return recommendations.filter((rec) => !rec.expires_at || new Date(rec.expires_at) > now);
     } catch (error) {
       console.error('Error getting recommendations:', error);
-      throw error;
+      return [];
     }
   }
 
@@ -579,6 +624,138 @@ export class ClientHealthService {
       console.error('Error dismissing recommendation:', error);
       throw error;
     }
+  }
+
+  /**
+   * Get client health information for a specific email sender
+   */
+  async getClientHealthForEmail(
+    userId: string,
+    fromEmail: string,
+  ): Promise<{
+    clientHealth?: ClientHealthScore;
+    recommendations?: PredictiveRecommendation[];
+    insights?: {
+      relationshipStatus: string;
+      suggestedActions: string[];
+      riskLevel: 'low' | 'medium' | 'high';
+    };
+  }> {
+    try {
+      // Extract email address from "Name <email@domain.com>" format
+      const emailMatch = fromEmail.match(/<([^>]+)>/) || [fromEmail, fromEmail];
+      const email = emailMatch[1];
+
+      // Get existing client health record
+      const { data: clientHealth } = await supabase
+        .from('client_health_scores')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('contact_email', email)
+        .single();
+
+      // Get active recommendations for this contact
+      const { data: recommendations } = await supabase
+        .from('predictive_recommendations')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('contact_email', email)
+        .in('status', ['pending', 'acknowledged'])
+        .order('priority_level', { ascending: false });
+
+      // Generate insights
+      const insights = this.generateInsights(clientHealth, recommendations || []);
+
+      return {
+        clientHealth: clientHealth || undefined,
+        recommendations: recommendations || [],
+        insights,
+      };
+    } catch (error) {
+      console.error('Error getting client health for email:', error);
+
+      // Return basic insights for new contacts
+      return {
+        clientHealth: undefined,
+        recommendations: [],
+        insights: {
+          relationshipStatus: 'New Contact',
+          suggestedActions: [
+            'Send a friendly response to establish relationship',
+            'Track response time for future insights',
+          ],
+          riskLevel: 'low',
+        },
+      };
+    }
+  }
+
+  /**
+   * Generate insights based on client health and recommendations
+   */
+  private generateInsights(
+    clientHealth?: ClientHealthScore,
+    recommendations: PredictiveRecommendation[] = [],
+  ): {
+    relationshipStatus: string;
+    suggestedActions: string[];
+    riskLevel: 'low' | 'medium' | 'high';
+  } {
+    if (!clientHealth) {
+      return {
+        relationshipStatus: 'New Contact',
+        suggestedActions: [
+          'Send a friendly response to establish relationship',
+          'Track response time for future insights',
+        ],
+        riskLevel: 'low',
+      };
+    }
+
+    const { health_score, relationship_trend } = clientHealth;
+    let riskLevel: 'low' | 'medium' | 'high' = 'low';
+    let relationshipStatus = 'Healthy';
+    const suggestedActions: string[] = [];
+
+    // Determine risk level and status
+    if (health_score >= 80) {
+      relationshipStatus = 'Excellent';
+      suggestedActions.push('Maintain current engagement level');
+    } else if (health_score >= 60) {
+      relationshipStatus = 'Good';
+      suggestedActions.push('Consider increasing communication frequency');
+    } else if (health_score >= 40) {
+      relationshipStatus = 'Needs Attention';
+      riskLevel = 'medium';
+      suggestedActions.push('Reach out to re-engage the contact');
+      suggestedActions.push('Review recent interactions for issues');
+    } else {
+      relationshipStatus = 'At Risk';
+      riskLevel = 'high';
+      suggestedActions.push('Immediate outreach recommended');
+      suggestedActions.push('Consider offering additional value or support');
+    }
+
+    // Add trend-based actions
+    if (relationship_trend === 'declining') {
+      riskLevel = riskLevel === 'high' ? 'high' : 'medium';
+      suggestedActions.push('Investigate reasons for declining relationship');
+    } else if (relationship_trend === 'improving') {
+      suggestedActions.push('Continue current successful approach');
+    }
+
+    // Add recommendation-based actions
+    recommendations.forEach((rec) => {
+      if (rec.priority_level === 'high' || rec.priority_level === 'critical') {
+        suggestedActions.push(rec.action_required);
+      }
+    });
+
+    return {
+      relationshipStatus,
+      suggestedActions: suggestedActions.slice(0, 5), // Limit to top 5 actions
+      riskLevel,
+    };
   }
 }
 

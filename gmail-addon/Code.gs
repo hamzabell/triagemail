@@ -196,28 +196,28 @@ function createHomepageCard() {
       .setImageStyle(CardService.ImageStyle.CIRCLE),
   );
 
-  // Main quick actions with client health focus
+  // Enhanced main quick actions
   const mainActions = CardService.newCardSection()
     .addWidget(
       CardService.newTextButton()
-        .setText('📊 Analyze Current Email')
-        .setOnClickAction(CardService.newAction().setFunctionName('analyzeCurrentEmailClean'))
+        .setText('📝 Create Reply Draft')
+        .setOnClickAction(CardService.newAction().setFunctionName('generateResponseForCurrent'))
         .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
         .setBackgroundColor('#06D6A0'),
     )
     .addWidget(
       CardService.newTextButton()
-        .setText('💬 Generate Response')
-        .setOnClickAction(CardService.newAction().setFunctionName('generateResponseForCurrent'))
+        .setText('📊 Analyze Current Email')
+        .setOnClickAction(CardService.newAction().setFunctionName('analyzeCurrentEmailClean'))
         .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
         .setBackgroundColor('#457B9D'),
     )
     .addWidget(
       CardService.newTextButton()
-        .setText('💚 Client Health Insights')
-        .setOnClickAction(CardService.newAction().setFunctionName('showClientHealthInsights'))
+        .setText('🏷️ Quick Label Actions')
+        .setOnClickAction(CardService.newAction().setFunctionName('showQuickLabelActions'))
         .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-        .setBackgroundColor('#10B981'),
+        .setBackgroundColor('#2A9D8F'),
     );
 
   card.addSection(mainActions);
@@ -395,14 +395,14 @@ function createEmailCard(emailData, classification) {
     card.addSection(alertSection);
   }
 
-  // Main Actions - Clear and focused
-  const mainActions = CardService.newCardSection()
-    .setHeader('🚀 Quick Actions')
+  // Enhanced Response Actions - NEW
+  const responseActions = CardService.newCardSection()
+    .setHeader('✍️ Response Actions')
     .addWidget(
       CardService.newTextButton()
-        .setText('Generate Response')
+        .setText('📝 Create Reply Draft')
         .setOnClickAction(
-          CardService.newAction().setFunctionName('handlePredefinedPrompt').setParameters({
+          CardService.newAction().setFunctionName('createAndOpenResponse').setParameters({
             promptId: 'professional_reply',
             messageId: emailData.emailId,
           }),
@@ -412,7 +412,65 @@ function createEmailCard(emailData, classification) {
     )
     .addWidget(
       CardService.newTextButton()
-        .setText('Mark as Completed')
+        .setText('💬 Quick Response')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('generateStyledResponse').setParameters({
+            style: 'concise',
+            messageId: emailData.emailId,
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setBackgroundColor('#457B9D'),
+    );
+
+  card.addSection(responseActions);
+
+  // Label Management Section - NEW
+  const labelSection = CardService.newCardSection()
+    .setHeader('🏷️ Label Management')
+    .addWidget(
+      CardService.newTextButton()
+        .setText('✅ Mark as Processed')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('addTriageLabel').setParameters({
+            messageId: emailData.emailId,
+            labelType: 'Triage/Processed',
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setBackgroundColor('#2A9D8F'),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('🔥 Set as Urgent')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('addTriageLabel').setParameters({
+            messageId: emailData.emailId,
+            labelType: 'Triage/Urgent',
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('⭐ Add Client Label')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('addTriageLabel').setParameters({
+            messageId: emailData.emailId,
+            labelType: 'Triage/Client',
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    );
+
+  card.addSection(labelSection);
+
+  // Status Actions - Updated
+  const statusActions = CardService.newCardSection()
+    .setHeader('📊 Status Actions')
+    .addWidget(
+      CardService.newTextButton()
+        .setText('✅ Mark as Completed')
         .setOnClickAction(
           CardService.newAction().setFunctionName('markEmailCompleted').setParameters({
             messageId: emailData.emailId,
@@ -420,14 +478,8 @@ function createEmailCard(emailData, classification) {
           }),
         )
         .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-        .setBackgroundColor('#2A9D8F'),
-    );
-
-  card.addSection(mainActions);
-
-  // More Options - Expandable section to reduce clutter
-  const moreSection = CardService.newCardSection()
-    .setHeader('⚙️ More Options')
+        .setBackgroundColor('#264653'),
+    )
     .addWidget(
       CardService.newTextButton()
         .setText('⏱️ Snooze for Later')
@@ -438,7 +490,13 @@ function createEmailCard(emailData, classification) {
           }),
         )
         .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
-    )
+    );
+
+  card.addSection(statusActions);
+
+  // Advanced Options
+  const advancedSection = CardService.newCardSection()
+    .setHeader('🔧 Advanced Options')
     .addWidget(
       CardService.newTextButton()
         .setText('👤 Add to Priority Contacts')
@@ -464,7 +522,7 @@ function createEmailCard(emailData, classification) {
         .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
     );
 
-  card.addSection(moreSection);
+  card.addSection(advancedSection);
 
   // Back button for better navigation
   card.setFixedFooter(
@@ -573,8 +631,21 @@ function createEmailCardWithQuickActions(emailData) {
 
   card.addSection(introSection);
 
+  // Enhanced Quick Actions Section
   const quickActionsSection = CardService.newCardSection()
     .setHeader('🚀 Quick Actions')
+    .addWidget(
+      CardService.newTextButton()
+        .setText('📝 Create Reply Draft')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('createAndOpenResponse').setParameters({
+            promptId: 'professional_reply',
+            messageId: emailData.emailId,
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setBackgroundColor('#06D6A0'),
+    )
     .addWidget(
       CardService.newTextButton()
         .setText('📊 Analyze Email')
@@ -585,25 +656,54 @@ function createEmailCardWithQuickActions(emailData) {
           }),
         )
         .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-        .setBackgroundColor('#06D6A0'),
-    )
-    .addWidget(
-      CardService.newTextButton()
-        .setText('📝 Generate Response')
-        .setOnClickAction(
-          CardService.newAction().setFunctionName('handlePredefinedPrompt').setParameters({
-            promptId: 'professional_reply',
-            messageId: emailData.emailId,
-          }),
-        )
-        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
         .setBackgroundColor('#457B9D'),
     );
 
   card.addSection(quickActionsSection);
 
-  const moreActionsSection = CardService.newCardSection()
-    .setHeader('🔍 More Analysis Options')
+  // Quick Label Management Section
+  const labelSection = CardService.newCardSection()
+    .setHeader('🏷️ Quick Labels')
+    .addWidget(
+      CardService.newTextButton()
+        .setText('✅ Mark as Processed')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('addTriageLabel').setParameters({
+            messageId: emailData.emailId,
+            labelType: 'Triage/Processed',
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setBackgroundColor('#2A9D8F'),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('🔥 Set as Urgent')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('addTriageLabel').setParameters({
+            messageId: emailData.emailId,
+            labelType: 'Triage/Urgent',
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('⭐ Add Client Label')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('addTriageLabel').setParameters({
+            messageId: emailData.emailId,
+            labelType: 'Triage/Client',
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    );
+
+  card.addSection(labelSection);
+
+  // Analysis Options Section
+  const analysisSection = CardService.newCardSection()
+    .setHeader('🔍 Analysis Options')
     .addWidget(
       CardService.newTextButton()
         .setText('⏱️ Check Urgency')
@@ -613,8 +713,7 @@ function createEmailCardWithQuickActions(emailData) {
             messageId: emailData.emailId,
           }),
         )
-        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
-        .setBackgroundColor('#F1FAEE'),
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
     )
     .addWidget(
       CardService.newTextButton()
@@ -625,8 +724,7 @@ function createEmailCardWithQuickActions(emailData) {
             messageId: emailData.emailId,
           }),
         )
-        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
-        .setBackgroundColor('#A8DADC'),
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
     )
     .addWidget(
       CardService.newTextButton()
@@ -637,11 +735,10 @@ function createEmailCardWithQuickActions(emailData) {
             messageId: emailData.emailId,
           }),
         )
-        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
-        .setBackgroundColor('#E9C46A'),
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
     );
 
-  card.addSection(moreActionsSection);
+  card.addSection(analysisSection);
 
   return card.build();
 }
@@ -905,6 +1002,81 @@ function classifyCurrentEmail(e) {
   }
 }
 
+/**
+ * Create a Gmail draft with generated response content
+ */
+function createResponseDraft(messageId, responseText, responseStyle = 'professional') {
+  try {
+    const message = GmailApp.getMessageById(messageId);
+    if (!message) {
+      throw new Error('Message not found');
+    }
+
+    const originalSubject = message.getSubject();
+    const sender = message.getFrom();
+    const senderEmail = extractEmailFromFrom(sender);
+
+    // Create reply subject
+    let replySubject = originalSubject;
+    if (!originalSubject.toLowerCase().startsWith('re: ')) {
+      replySubject = 'Re: ' + originalSubject;
+    }
+
+    // Add greeting based on response style
+    let greeting = '';
+    const senderName = extractNameFromEmail(sender);
+
+    switch (responseStyle) {
+      case 'casual':
+        greeting = `Hi ${senderName},\n\n`;
+        break;
+      case 'formal':
+        greeting = `Dear ${senderName},\n\n`;
+        break;
+      default:
+        greeting = `Hello ${senderName},\n\n`;
+    }
+
+    // Combine greeting with response text
+    const fullResponse = greeting + responseText;
+
+    // Create the draft
+    const draft = GmailApp.createDraft(senderEmail, replySubject, fullResponse);
+
+    Logger.log(`Created response draft for message ${messageId}`);
+    return draft;
+  } catch (error) {
+    Logger.log('Error in createResponseDraft: ' + error.toString());
+    return null;
+  }
+}
+
+/**
+ * Extract email address from "from" field
+ */
+function extractEmailFromFrom(from) {
+  if (!from) return '';
+
+  // Extract email from "Name <email@domain.com>" format
+  const emailMatch = from.match(/<([^>]+)>/);
+  if (emailMatch) {
+    return emailMatch[1];
+  }
+
+  // Extract email from "email@domain.com" format
+  const atIndex = from.indexOf('@');
+  if (atIndex > 0) {
+    const start = from.lastIndexOf(' ', atIndex) + 1;
+    const end = from.indexOf('>', atIndex);
+    return from.substring(start, end > 0 ? end : from.length);
+  }
+
+  return from;
+}
+
+/**
+ * Enhanced response generation that creates Gmail drafts
+ */
 function generateResponseForCurrent(e) {
   try {
     // Get the current email context from Gmail
@@ -927,19 +1099,141 @@ function generateResponseForCurrent(e) {
     // Generate response using the professional reply prompt
     const result = processPredefinedPrompt(emailData, 'professional_reply');
 
-    if (result) {
-      return CardService.newActionResponseBuilder()
-        .setNotification(CardService.newNotification().setText('Response generated successfully!'))
-        .build();
+    if (result && result.result) {
+      // Create a draft with the generated response
+      const draft = createResponseDraft(messageId, result.result, 'professional');
+
+      if (draft) {
+        return CardService.newActionResponseBuilder()
+          .setNotification(
+            CardService.newNotification().setText('✅ Response draft created! Check your drafts folder.'),
+          )
+          .build();
+      } else {
+        return CardService.newActionResponseBuilder()
+          .setNotification(CardService.newNotification().setText('❌ Failed to create draft'))
+          .build();
+      }
     } else {
       return CardService.newActionResponseBuilder()
-        .setNotification(CardService.newNotification().setText('Response generation failed. Please try again.'))
+        .setNotification(CardService.newNotification().setText('❌ Response generation failed. Please try again.'))
         .build();
     }
   } catch (error) {
     Logger.log('Generate response for current email error: ' + error.toString());
     return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText('Unable to generate response'))
+      .setNotification(CardService.newNotification().setText('❌ Unable to generate response'))
+      .build();
+  }
+}
+
+/**
+ * Generate response with specific style and create draft
+ */
+function generateStyledResponse(e) {
+  const messageId = e.parameters.messageId;
+  const responseStyle = e.parameters.style || 'professional';
+
+  try {
+    if (!messageId) {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('No email context found'))
+        .build();
+    }
+
+    const message = GmailApp.getMessageById(messageId);
+    const emailData = {
+      subject: message.getSubject(),
+      body: message.getPlainBody(),
+      from: message.getFrom(),
+      emailId: messageId,
+      userId: authManager.getUserEmailSafely(),
+    };
+
+    // Map response style to prompt ID
+    const promptMap = {
+      casual: 'casual_reply',
+      formal: 'formal_reply',
+      professional: 'professional_reply',
+      concise: 'concise_response',
+    };
+
+    const promptId = promptMap[responseStyle] || 'professional_reply';
+    const result = processPredefinedPrompt(emailData, promptId);
+
+    if (result && result.result) {
+      // Create a draft with the generated response
+      const draft = createResponseDraft(messageId, result.result, responseStyle);
+
+      if (draft) {
+        const styleDisplay = responseStyle.charAt(0).toUpperCase() + responseStyle.slice(1);
+        return CardService.newActionResponseBuilder()
+          .setNotification(CardService.newNotification().setText(`✅ ${styleDisplay} response draft created!`))
+          .build();
+      } else {
+        return CardService.newActionResponseBuilder()
+          .setNotification(CardService.newNotification().setText('❌ Failed to create draft'))
+          .build();
+      }
+    } else {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('❌ Response generation failed'))
+        .build();
+    }
+  } catch (error) {
+    Logger.log('Generate styled response error: ' + error.toString());
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('❌ Unable to generate response'))
+      .build();
+  }
+}
+
+/**
+ * Create response and open compose action
+ */
+function createAndOpenResponse(e) {
+  const messageId = e.parameters.messageId;
+  const promptId = e.parameters.promptId || 'professional_reply';
+
+  try {
+    if (!messageId) {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('No email context found'))
+        .build();
+    }
+
+    const message = GmailApp.getMessageById(messageId);
+    const emailData = {
+      subject: message.getSubject(),
+      body: message.getPlainBody(),
+      from: message.getFrom(),
+      emailId: messageId,
+      userId: authManager.getUserEmailSafely(),
+    };
+
+    const result = processPredefinedPrompt(emailData, promptId);
+
+    if (result && result.result) {
+      // Create a draft with the generated response
+      const draft = createResponseDraft(messageId, result.result, 'professional');
+
+      if (draft) {
+        // Return compose action response to open the draft
+        return CardService.newComposeActionResponseBuilder().setGmailDraft(draft).build();
+      } else {
+        return CardService.newActionResponseBuilder()
+          .setNotification(CardService.newNotification().setText('❌ Failed to create draft'))
+          .build();
+      }
+    } else {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('❌ Response generation failed'))
+        .build();
+    }
+  } catch (error) {
+    Logger.log('Create and open response error: ' + error.toString());
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('❌ Unable to create response'))
       .build();
   }
 }
@@ -1195,6 +1489,262 @@ function createCategoryWidget(category) {
     .setTopLabel('Category')
     .setContent(category || 'Unknown')
     .setIcon(CardService.Icon.TAG);
+}
+
+/**
+ * Create Triage-specific labels if they don't exist
+ */
+function createTriageLabels() {
+  try {
+    const labelNames = [
+      'Triage/Priority',
+      'Triage/Processed',
+      'Triage/Urgent',
+      'Triage/Client',
+      'Triage/VIP',
+      'Triage/Standard',
+    ];
+
+    const createdLabels = {};
+
+    labelNames.forEach((labelName) => {
+      try {
+        // Check if label already exists
+        const existingLabel = GmailApp.getUserLabels().find((label) => label.getName() === labelName);
+        if (existingLabel) {
+          createdLabels[labelName] = existingLabel;
+          Logger.log(`Label already exists: ${labelName}`);
+        } else {
+          // Create new label
+          const newLabel = GmailApp.createLabel(labelName);
+          createdLabels[labelName] = newLabel;
+          Logger.log(`Created new label: ${labelName}`);
+        }
+      } catch (labelError) {
+        Logger.log(`Error creating label ${labelName}: ${labelError.toString()}`);
+        // Continue with other labels even if one fails
+      }
+    });
+
+    return createdLabels;
+  } catch (error) {
+    Logger.log('Error in createTriageLabels: ' + error.toString());
+    return {};
+  }
+}
+
+/**
+ * Add labels to an email based on classification
+ */
+function addEmailLabels(messageId, classification) {
+  try {
+    const message = GmailApp.getMessageById(messageId);
+    if (!message) {
+      throw new Error('Message not found');
+    }
+
+    const labels = createTriageLabels();
+    const addedLabels = [];
+
+    // Add priority-based labels
+    if (classification.priorityLevel) {
+      const priorityLabel = getPriorityLabel(classification.priorityLevel);
+      if (labels[priorityLabel] && typeof labels[priorityLabel].addToThread === 'function') {
+        labels[priorityLabel].addToThread(message.getThread());
+        addedLabels.push(priorityLabel);
+      }
+    }
+
+    // Add category-based labels
+    if (classification.category) {
+      const categoryLabel = getCategoryLabel(classification.category);
+      if (labels[categoryLabel] && typeof labels[categoryLabel].addToThread === 'function') {
+        labels[categoryLabel].addToThread(message.getThread());
+        addedLabels.push(categoryLabel);
+      }
+    }
+
+    // Add processed label
+    if (labels['Triage/Processed'] && typeof labels['Triage/Processed'].addToThread === 'function') {
+      labels['Triage/Processed'].addToThread(message.getThread());
+      addedLabels.push('Triage/Processed');
+    }
+
+    Logger.log(`Added labels to message ${messageId}: ${addedLabels.join(', ')}`);
+    return addedLabels;
+  } catch (error) {
+    Logger.log('Error in addEmailLabels: ' + error.toString());
+    return [];
+  }
+}
+
+/**
+ * Remove specific labels from an email
+ */
+function removeEmailLabels(messageId, labelNames) {
+  try {
+    const message = GmailApp.getMessageById(messageId);
+    if (!message) {
+      throw new Error('Message not found');
+    }
+
+    const userLabels = GmailApp.getUserLabels();
+    const removedLabels = [];
+
+    labelNames.forEach((labelName) => {
+      const label = userLabels.find((l) => l.getName() === labelName);
+      if (label) {
+        label.removeFromThread(message.getThread());
+        removedLabels.push(labelName);
+      }
+    });
+
+    Logger.log(`Removed labels from message ${messageId}: ${removedLabels.join(', ')}`);
+    return removedLabels;
+  } catch (error) {
+    Logger.log('Error in removeEmailLabels: ' + error.toString());
+    return [];
+  }
+}
+
+/**
+ * Get current labels applied to an email
+ */
+function getEmailLabels(messageId) {
+  try {
+    const message = GmailApp.getMessageById(messageId);
+    if (!message) {
+      return [];
+    }
+
+    const labels = message.getLabels();
+    return labels.map((label) => label.getName());
+  } catch (error) {
+    Logger.log('Error in getEmailLabels: ' + error.toString());
+    return [];
+  }
+}
+
+/**
+ * Get priority label name based on classification
+ */
+function getPriorityLabel(priorityLevel) {
+  switch (priorityLevel) {
+    case 'urgent':
+      return 'Triage/Urgent';
+    case 'client':
+      return 'Triage/Client';
+    case 'vip':
+      return 'Triage/VIP';
+    case 'standard':
+      return 'Triage/Standard';
+    default:
+      return 'Triage/Standard';
+  }
+}
+
+/**
+ * Get category label name based on classification
+ */
+function getCategoryLabel(category) {
+  switch (category.toLowerCase()) {
+    case 'priority':
+    case 'urgent':
+      return 'Triage/Priority';
+    case 'client':
+    case 'business':
+      return 'Triage/Client';
+    default:
+      return 'Triage/Standard';
+  }
+}
+
+/**
+ * Add triage label action handler
+ */
+function addTriageLabel(e) {
+  const messageId = e.parameters.messageId;
+  const labelType = e.parameters.labelType || 'Triage/Processed';
+
+  try {
+    Logger.log(`addTriageLabel called with messageId: ${messageId}, labelType: ${labelType}`);
+
+    const message = GmailApp.getMessageById(messageId);
+    if (!message) {
+      throw new Error('Message not found: ' + messageId);
+    }
+
+    Logger.log(`Retrieved message: ${message.getSubject()}`);
+
+    // Get the label directly
+    let label = GmailApp.getUserLabelByName(labelType);
+    Logger.log(`Retrieved label: ${label}, labelType: ${labelType}`);
+
+    // If label doesn't exist, create it
+    if (!label) {
+      try {
+        label = GmailApp.createLabel(labelType);
+        Logger.log('Created new label: ' + labelType);
+      } catch (createError) {
+        Logger.log('Error creating label: ' + createError.toString());
+        throw new Error('Unable to create label: ' + labelType);
+      }
+    }
+
+    // Debug: Check the label object properties
+    Logger.log(`Label object type: ${typeof label}, Label: ${JSON.stringify(label)}`);
+    Logger.log(`Label methods: ${Object.getOwnPropertyNames(label)}`);
+
+    // Verify that label is a GmailLabel object and has the correct methods
+    if (label && typeof label.addToThread === 'function') {
+      // GmailLabel uses addToThread, not addToMessage
+      label.addToThread(message.getThread());
+      Logger.log(`Added ${labelType} label to message ${messageId}`);
+
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText(`✅ Added ${labelType} label`))
+        .build();
+    } else {
+      throw new Error('Label is not a valid GmailLabel object: ' + labelType + ', type: ' + typeof label);
+    }
+  } catch (error) {
+    Logger.log('Error in addTriageLabel: ' + error.toString());
+    Logger.log('Error stack: ' + error.stack);
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('❌ Error adding label'))
+      .build();
+  }
+}
+
+/**
+ * Remove triage label action handler
+ */
+function removeTriageLabel(e) {
+  const messageId = e.parameters.messageId;
+  const labelType = e.parameters.labelType || 'Triage/Processed';
+
+  try {
+    const message = GmailApp.getMessageById(messageId);
+    const userLabels = GmailApp.getUserLabels();
+    const label = userLabels.find((l) => l.getName() === labelType);
+
+    if (label && message) {
+      label.removeFromThread(message.getThread());
+
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText(`🗑️ Removed ${labelType} label`))
+        .build();
+    } else {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('❌ Unable to remove label'))
+        .build();
+    }
+  } catch (error) {
+    Logger.log('Error in removeTriageLabel: ' + error.toString());
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('❌ Error removing label'))
+      .build();
+  }
 }
 
 function getPriorityIcon(priority) {
@@ -2043,6 +2593,112 @@ function showPromptMenu(e) {
 }
 
 /**
+ * Show Quick Label Actions
+ * Provides quick access to label management for current email
+ */
+function showQuickLabelActions(e) {
+  const messageId = e.gmail ? e.gmail.messageId : null;
+
+  if (!messageId) {
+    const errorCard = CardService.newCardBuilder().setHeader(
+      CardService.newCardHeader().setTitle('Quick Label Actions').setSubtitle('Error'),
+    );
+    const errorSection = CardService.newCardSection()
+      .addWidget(CardService.newTextParagraph().setText('❌ Please open an email to use quick label actions'))
+      .addWidget(
+        CardService.newTextButton()
+          .setText('← Back to Home')
+          .setOnClickAction(CardService.newAction().setFunctionName('buildAddOn'))
+          .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+      );
+
+    errorCard.addSection(errorSection);
+    return errorCard.build();
+  }
+
+  const card = CardService.newCardBuilder().setHeader(
+    CardService.newCardHeader().setTitle('🏷️ Quick Label Actions').setSubtitle('Manage email labels'),
+  );
+
+  const quickLabelsSection = CardService.newCardSection()
+    .setHeader('⚡ Quick Labels')
+    .addWidget(
+      CardService.newTextButton()
+        .setText('✅ Mark as Processed')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('addTriageLabel').setParameters({
+            messageId: messageId,
+            labelType: 'Triage/Processed',
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('🔥 Set as Urgent')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('addTriageLabel').setParameters({
+            messageId: messageId,
+            labelType: 'Triage/Urgent',
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('⭐ Add Client Label')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('addTriageLabel').setParameters({
+            messageId: messageId,
+            labelType: 'Triage/Client',
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED),
+    );
+
+  card.addSection(quickLabelsSection);
+
+  const removeLabelsSection = CardService.newCardSection()
+    .setHeader('🗑️ Remove Labels')
+    .addWidget(
+      CardService.newTextButton()
+        .setText('Remove Processed Label')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('removeTriageLabel').setParameters({
+            messageId: messageId,
+            labelType: 'Triage/Processed',
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('Remove Urgent Label')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('removeTriageLabel').setParameters({
+            messageId: messageId,
+            labelType: 'Triage/Urgent',
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    );
+
+  card.addSection(removeLabelsSection);
+
+  // Back navigation
+  card.setFixedFooter(
+    CardService.newFixedFooter().setPrimaryButton(
+      CardService.newTextButton()
+        .setText('← Back to Home')
+        .setOnClickAction(CardService.newAction().setFunctionName('buildAddOn'))
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    ),
+  );
+
+  return card.build();
+}
+
+/**
  * Show Settings Menu with better navigation
  */
 function showSettingsMenu(e) {
@@ -2160,7 +2816,7 @@ function showContactHealthProfile(e) {
       .setIcon(CardService.Icon.EMOTICONS),
   );
 
-  card.pushSection(section);
+  card.addSection(section);
 
   // Relationship Insights
   const insightsSection = CardService.newCardSection().setHeader('🔍 AI Insights');
@@ -2175,7 +2831,7 @@ function showContactHealthProfile(e) {
     CardService.newTextParagraph().setText('⚡ Recommend maintaining current engagement level'),
   );
 
-  card.pushSection(insightsSection);
+  card.addSection(insightsSection);
 
   // Quick Actions
   const actionsSection = CardService.newCardSection().setHeader('⚡ Quick Actions');
@@ -2196,7 +2852,7 @@ function showContactHealthProfile(e) {
       ),
   );
 
-  card.pushSection(actionsSection);
+  card.addSection(actionsSection);
 
   // Back button
   card.setFixedFooter(
@@ -2268,7 +2924,7 @@ function showClientHealthInsights(e) {
           .setIcon(CardService.Icon.TrendingUp),
       );
 
-    card.pushSection(overviewSection);
+    card.addSection(overviewSection);
 
     // Actions Section
     const actionsSection = CardService.newCardSection()
@@ -2289,7 +2945,7 @@ function showClientHealthInsights(e) {
           .setOnClickAction(CardService.newAction().setFunctionName('showAtRiskContacts')),
       );
 
-    card.pushSection(actionsSection);
+    card.addSection(actionsSection);
 
     // Back button
     card.setFixedFooter(
@@ -2326,7 +2982,7 @@ function showPredictiveInsights(e) {
       .addWidget(CardService.newTextParagraph().setText('📈 Response patterns analyzed'))
       .addWidget(CardService.newTextParagraph().setText('🎯 Optimal timing recommendations'));
 
-    card.pushSection(insightsSection);
+    card.addSection(insightsSection);
 
     const actionsSection = CardService.newCardSection()
       .setHeader('⚡ Smart Actions')
@@ -2341,7 +2997,7 @@ function showPredictiveInsights(e) {
           .setOnClickAction(CardService.newAction().setFunctionName('showTimingOptimization')),
       );
 
-    card.pushSection(actionsSection);
+    card.addSection(actionsSection);
 
     // Back button
     card.setFixedFooter(

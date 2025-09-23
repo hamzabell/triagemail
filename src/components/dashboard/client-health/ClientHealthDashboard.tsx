@@ -11,6 +11,7 @@ import { ResponseTimeChart } from './ResponseTimeChart';
 import { ContactHealthCard } from './ContactHealthCard';
 import { RecommendationsPanel } from './RecommendationsPanel';
 import { ClientHealthScore } from '@/types/priority';
+import { Target, Mail } from 'lucide-react';
 
 interface PredictiveRecommendation {
   id: string;
@@ -48,6 +49,63 @@ export function ClientHealthDashboard({ userId }: ClientHealthDashboardProps) {
   useEffect(() => {
     loadHealthData();
   }, [userId]);
+
+  const generateSampleData = async (userId: string) => {
+    try {
+      // Create sample client health scores
+      const sampleContacts = [
+        {
+          contact_email: 'john.doe@company.com',
+          contact_name: 'John Doe',
+          company: 'Company Inc',
+          health_score: 85,
+          response_time_avg: 4.2,
+          sentiment_score: 0.7,
+          email_frequency: 3.5,
+          relationship_trend: 'improving' as const,
+        },
+        {
+          contact_email: 'jane.smith@business.org',
+          contact_name: 'Jane Smith',
+          company: 'Business LLC',
+          health_score: 72,
+          response_time_avg: 8.1,
+          sentiment_score: 0.3,
+          email_frequency: 2.1,
+          relationship_trend: 'stable' as const,
+        },
+        {
+          contact_email: 'bob.wilson@startup.io',
+          contact_name: 'Bob Wilson',
+          company: 'Startup Co',
+          health_score: 45,
+          response_time_avg: 24.5,
+          sentiment_score: -0.2,
+          email_frequency: 1.2,
+          relationship_trend: 'declining' as const,
+        },
+      ];
+
+      for (const contact of sampleContacts) {
+        await fetch('/api/client-health', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contact_email: contact.contact_email,
+            response_time: contact.response_time_avg,
+            sentiment_score: contact.sentiment_score,
+          }),
+        });
+      }
+
+      // Refresh the data
+      loadHealthData();
+    } catch (error) {
+      console.error('Error generating sample data:', error);
+    }
+  };
 
   const loadHealthData = async () => {
     try {
@@ -366,9 +424,26 @@ export function ClientHealthDashboard({ userId }: ClientHealthDashboardProps) {
           {healthScores.length === 0 && (
             <Card>
               <CardContent className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <p className="text-muted-foreground mb-4">No client health data available yet.</p>
-                  <Button onClick={() => (window.location.href = '/dashboard')}>Process Some Emails</Button>
+                <div className="text-center max-w-md">
+                  <div className="mb-4">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                      <Target className="h-8 w-8 text-white" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2">Client Health Intelligence</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Track and improve your client relationships with AI-powered insights. Process emails to see
+                      relationship health scores, response patterns, and personalized recommendations.
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    <Button onClick={() => (window.location.href = '/dashboard')} className="w-full">
+                      <Mail className="h-4 w-4 mr-2" />
+                      Process Emails to Get Started
+                    </Button>
+                    <Button variant="outline" onClick={() => generateSampleData(userId)} className="w-full">
+                      Generate Sample Data
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
