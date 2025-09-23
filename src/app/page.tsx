@@ -87,8 +87,9 @@ export default function LandingPage() {
           </h1>
 
           <p className="text-xl md:text-xl mb-8 max-w-2xl mx-auto leading-relaxed text-[#1D3557]">
-            The only AI email assistant that categorizes, prioritizes, and drafts responses—right inside your Gmail.
-            Save 10+ hours weekly with intelligent automation that learns your workflow.
+            The only AI email assistant that categorizes, prioritizes, and analyzes relationships—right inside your
+            Gmail. Save 10+ hours weekly with intelligent automation that learns your workflow and predicts client
+            needs.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -112,7 +113,7 @@ export default function LandingPage() {
       <section id="features" className="py-24 px-10 bg-white">
         <div className="max-w-4xl mx-auto">
           <h2 className="font-heading text-4xl md:text-5xl font-black mb-16 text-center text-[#1D3557]">
-            Why Professionals Choose TriageMail
+            The Future of Email Relationship Management
           </h2>
 
           <div className="space-y-8">
@@ -130,14 +131,27 @@ export default function LandingPage() {
             </div>
 
             <div className="flex items-start gap-5 p-6 rounded-lg hover:bg-[#F1FAEE] transition-colors">
-              <div className="w-12 h-12 bg-[#FF3366] rounded-full flex items-center justify-center text-white flex-shrink-0">
+              <div className="w-12 h-12 bg-[#457B9D] rounded-full flex items-center justify-center text-white flex-shrink-0">
+                <CheckCircle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-heading text-xl font-bold mb-2 text-[#1D3557]">Client Health Intelligence</h3>
+                <p className="text-[#1D3557] leading-relaxed">
+                  AI-powered relationship scoring (0-100) that tracks response patterns, sentiment analysis, and
+                  identifies at-risk relationships before they become problems.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-5 p-6 rounded-lg hover:bg-[#F1FAEE] transition-colors">
+              <div className="w-12 h-12 bg-[#1D3557] rounded-full flex items-center justify-center text-white flex-shrink-0">
                 <Zap className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-heading text-xl font-bold mb-2 text-[#1D3557]">AI-Generated Responses</h3>
+                <h3 className="font-heading text-xl font-bold mb-2 text-[#1D3557]">Predictive Email Intelligence</h3>
                 <p className="text-[#1D3557] leading-relaxed">
-                  One-click professional responses in Professional, Casual, or Formal tones. Slash response time by 80%
-                  with smart drafting.
+                  Advanced algorithms that predict response times, identify communication patterns, and provide
+                  actionable insights to improve your email effectiveness and relationship management.
                 </p>
               </div>
             </div>
@@ -147,10 +161,23 @@ export default function LandingPage() {
                 <Bell className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-heading text-xl font-bold mb-2 text-[#1D3557]">Native Gmail Integration</h3>
+                <h3 className="font-heading text-xl font-bold mb-2 text-[#1D3557]">AI-Generated Responses</h3>
                 <p className="text-[#1D3557] leading-relaxed">
-                  No context switching. Works directly inside Gmail with real-time processing, deadline detection, and
-                  one-click actions.
+                  One-click professional responses in Professional, Casual, or Formal tones. Slash response time by 80%
+                  with smart drafting powered by sentiment analysis.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-5 p-6 rounded-lg hover:bg-[#F1FAEE] transition-colors">
+              <div className="w-12 h-12 bg-[#457B9D] rounded-full flex items-center justify-center text-white flex-shrink-0">
+                <Layers className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-heading text-xl font-bold mb-2 text-[#1D3557]">Relationship Analytics Dashboard</h3>
+                <p className="text-[#1D3557] leading-relaxed">
+                  Comprehensive analytics showing response trends, relationship health scores, and predictive insights
+                  to help you nurture professional relationships effectively.
                 </p>
               </div>
             </div>
@@ -198,6 +225,10 @@ export default function LandingPage() {
                   <CheckCircle className="w-5 h-5 text-[#FF3366] mr-3 mt-0.5 flex-shrink-0" />
                   Native Gmail integration
                 </li>
+                <li className="flex items-start">
+                  <CheckCircle className="w-5 h-5 text-[#FF3366] mr-3 mt-0.5 flex-shrink-0" />
+                  Basic relationship analytics
+                </li>
               </ul>
               <a
                 href="/signup"
@@ -230,7 +261,19 @@ export default function LandingPage() {
                 </li>
                 <li className="flex items-start">
                   <CheckCircle className="w-5 h-5 text-[#FF3366] mr-3 mt-0.5 flex-shrink-0" />
-                  Time-saving analytics dashboard
+                  <strong>Client Health Scoring & Intelligence</strong>
+                </li>
+                <li className="flex items-start">
+                  <CheckCircle className="w-5 h-5 text-[#FF3366] mr-3 mt-0.5 flex-shrink-0" />
+                  <strong>Predictive Email Analytics</strong>
+                </li>
+                <li className="flex items-start">
+                  <CheckCircle className="w-5 h-5 text-[#FF3366] mr-3 mt-0.5 flex-shrink-0" />
+                  Advanced relationship dashboard
+                </li>
+                <li className="flex items-start">
+                  <CheckCircle className="w-5 h-5 text-[#FF3366] mr-3 mt-0.5 flex-shrink-0" />
+                  Sentiment analysis & emotion tracking
                 </li>
                 <li className="flex items-start">
                   <CheckCircle className="w-5 h-5 text-[#FF3366] mr-3 mt-0.5 flex-shrink-0" />
@@ -255,9 +298,10 @@ export default function LandingPage() {
       {/* CTA Section */}
       <section className="py-24 px-10 bg-gradient-to-br from-[#FF3366] to-[#FF6B6B] text-white text-center">
         <div className="max-w-3xl mx-auto">
-          <h2 className="font-heading text-4xl md:text-5xl font-black mb-4">Save 10+ Hours Every Week</h2>
+          <h2 className="font-heading text-4xl md:text-5xl font-black mb-4">Build Stronger Client Relationships</h2>
           <p className="text-xl mb-8 opacity-90">
-            Join professionals who&apos;ve transformed their email productivity with AI that works inside Gmail.
+            Join professionals who&apos;ve transformed their email productivity with AI-powered relationship
+            intelligence that works inside Gmail and predicts client needs.
           </p>
           <a
             href="/signup"

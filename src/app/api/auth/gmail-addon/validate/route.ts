@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 /**
  * Health check endpoint for Gmail add-on authentication
  */
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     return NextResponse.json({
       success: true,

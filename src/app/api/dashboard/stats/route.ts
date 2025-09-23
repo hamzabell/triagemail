@@ -1,28 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { supabase } from '@/lib/db';
-import { withGmailAddonValidation, getGmailAddonUserInfo } from '@/lib/gmail-validation-middleware';
 
-// Wrap the handler with Gmail add-on validation
-export const GET = withGmailAddonValidation(async (request: NextRequest) => {
-  // Get user info from validated request (either from Gmail add-on or regular auth)
-  const userInfo = getGmailAddonUserInfo(request);
-
-  let user;
-  if (userInfo) {
-    // Gmail add-on authenticated user
-    user = {
-      id: userInfo.userId,
-      email: userInfo.userEmail,
-    };
-  } else {
-    // Regular authenticated user
-    const authUser = await requireAuth();
-    if (authUser instanceof NextResponse) {
-      return authUser;
-    }
-    user = authUser;
+export const GET = async () => {
+  // Try regular authentication first
+  const authUser = await requireAuth();
+  if (authUser instanceof NextResponse) {
+    return authUser;
   }
+
+  const user = authUser;
 
   try {
     const { error: userError } = await supabase.from('users').select('*').eq('id', user.id).single();
@@ -34,7 +21,7 @@ export const GET = withGmailAddonValidation(async (request: NextRequest) => {
           {
             id: user.id,
             email: user.email || '',
-            name: userInfo?.userEmail?.split('@')[0] || 'Gmail User',
+            name: user.email?.split('@')[0] || 'User',
             avatar: '',
           },
         ])
@@ -139,4 +126,4 @@ export const GET = withGmailAddonValidation(async (request: NextRequest) => {
     console.error('Dashboard stats error:', error);
     return NextResponse.json({ error: 'Failed to fetch dashboard statistics' }, { status: 500 });
   }
-});
+};

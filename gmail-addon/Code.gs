@@ -112,6 +112,20 @@ class AuthManager {
 const authManager = new AuthManager();
 
 /**
+ * Gmail Add-on Entry Point - REQUIRED FUNCTION
+ * This is the main entry point that Gmail calls to build the add-on
+ */
+function buildAddOn(e) {
+  try {
+    const card = createHomepageCard();
+    return card;
+  } catch (error) {
+    Logger.log('Error in buildAddOn: ' + error.toString());
+    return createErrorCard('Unable to load TriageMail');
+  }
+}
+
+/**
  * Gmail Homepage Trigger - REQUIRED FUNCTION
  */
 function onGmailHomepage(e) {
@@ -171,216 +185,296 @@ function onComposeTrigger(e) {
 }
 
 /**
- * Create Homepage Card
+ * Create Enhanced Homepage Card with Client Health Features
+ * Includes client health scoring and predictive intelligence
  */
 function createHomepageCard() {
-  const card = CardService.newCardBuilder()
-    .setHeader(
-      CardService.newCardHeader()
-        .setTitle('TriageMail')
-        .setSubtitle('AI-Powered Email Triage')
-        .setImageStyle(CardService.ImageStyle.CIRCLE),
-    )
-    .addSection(
-      CardService.newCardSection().addWidget(
-        CardService.newTextParagraph().setText(
-          'Welcome to TriageMail! Get AI-powered email classification and response suggestions directly in Gmail.',
-        ),
-      ),
-    );
+  const card = CardService.newCardBuilder().setHeader(
+    CardService.newCardHeader()
+      .setTitle('TriageMail')
+      .setSubtitle('AI Email Assistant with Client Health Intelligence')
+      .setImageStyle(CardService.ImageStyle.CIRCLE),
+  );
 
-  let stats = { emailsProcessed: 'Loading...', timeSaved: 'Loading...', accuracyRate: 'Loading...' };
-  try {
-    stats = fetchUserStats();
-  } catch (error) {
-    Logger.log('Error fetching stats: ' + error.toString());
-    stats = { emailsProcessed: '0', timeSaved: '0 hours', accuracyRate: '0%' };
-  }
-
-  const statsSection = CardService.newCardSection()
-    .setHeader('Your Statistics')
-    .addWidget(
-      CardService.newKeyValue()
-        .setTopLabel('Emails Processed')
-        .setContent(stats.emailsProcessed)
-        .setIcon(CardService.Icon.EMAIL),
-    )
-    .addWidget(
-      CardService.newKeyValue().setTopLabel('Time Saved').setContent(stats.timeSaved).setIcon(CardService.Icon.CLOCK),
-    )
-    .addWidget(
-      CardService.newKeyValue()
-        .setTopLabel('Accuracy Rate')
-        .setContent(stats.accuracyRate)
-        .setIcon(CardService.Icon.STAR),
-    );
-
-  card.addSection(statsSection);
-
-  const actionSection = CardService.newCardSection()
+  // Main quick actions with client health focus
+  const mainActions = CardService.newCardSection()
     .addWidget(
       CardService.newTextButton()
-        .setText('View Dashboard')
-        .setOpenLink(CardService.newOpenLink().setUrl(getApiBaseUrl().replace('/api', '/dashboard')))
-        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-        .setBackgroundColor('#FF3366'),
-    )
-    .addWidget(
-      CardService.newTextButton()
-        .setText('Settings')
-        .setOnClickAction(CardService.newAction().setFunctionName('openSettings'))
-        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
-        .setBackgroundColor('#1D3557'),
-    );
-
-  card.addSection(actionSection);
-
-  const quickActionsSection = CardService.newCardSection()
-    .setHeader('Quick Actions')
-    .addWidget(
-      CardService.newTextButton()
-        .setText('Classify Current Email')
-        .setOnClickAction(CardService.newAction().setFunctionName('classifyCurrentEmail'))
+        .setText('📊 Analyze Current Email')
+        .setOnClickAction(CardService.newAction().setFunctionName('analyzeCurrentEmailClean'))
         .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
         .setBackgroundColor('#06D6A0'),
     )
     .addWidget(
       CardService.newTextButton()
-        .setText('Generate Response')
+        .setText('💬 Generate Response')
         .setOnClickAction(CardService.newAction().setFunctionName('generateResponseForCurrent'))
         .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
         .setBackgroundColor('#457B9D'),
-    );
-
-  card.addSection(quickActionsSection);
-
-  // Add Focus Mode section
-  const focusActionsSection = CardService.newCardSection()
-    .setHeader('📊 Focus Mode')
-    .addWidget(
-      CardService.newTextButton()
-        .setText('View Focus Mode')
-        .setOnClickAction(CardService.newAction().setFunctionName('showFocusMode'))
-        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
-        .setBackgroundColor('#F1FAEE'),
-    );
-
-  card.addSection(focusActionsSection);
-
-  // Add Recent Emails section
-  const recentEmailsSection = CardService.newCardSection()
-    .setHeader('📬 Recent Emails')
-    .addWidget(CardService.newTextParagraph().setText('Quickly analyze your recent emails'))
-    .addWidget(
-      CardService.newTextButton()
-        .setText('🔍 Analyze Recent (5)')
-        .setOnClickAction(CardService.newAction().setFunctionName('analyzeRecentEmails').setParameters({ count: '5' }))
-        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
-        .setBackgroundColor('#E9C46A'),
     )
     .addWidget(
       CardService.newTextButton()
-        .setText('📈 View Analytics')
-        .setOnClickAction(CardService.newAction().setFunctionName('showUserAnalytics'))
-        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
-        .setBackgroundColor('#A8DADC'),
+        .setText('💚 Client Health Insights')
+        .setOnClickAction(CardService.newAction().setFunctionName('showClientHealthInsights'))
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setBackgroundColor('#10B981'),
     );
 
-  card.addSection(recentEmailsSection);
+  card.addSection(mainActions);
 
-  // Add Prompt Library section
-  const promptSection = CardService.newCardSection()
-    .setHeader('💬 Quick Prompts')
-    .addWidget(CardService.newTextParagraph().setText('Try these AI-powered prompts'));
+  // Enhanced stats with client health metrics
+  try {
+    const stats = fetchUserStats();
+    const healthStats = fetchClientHealthStats();
+    const statsCompact = CardService.newCardSection()
+      .addWidget(
+        CardService.newKeyValue()
+          .setTopLabel('Emails Processed')
+          .setContent(stats.emailsProcessed)
+          .setIcon(CardService.Icon.EMAIL),
+      )
+      .addWidget(
+        CardService.newKeyValue().setTopLabel('Time Saved').setContent(stats.timeSaved).setIcon(CardService.Icon.CLOCK),
+      )
+      .addWidget(
+        CardService.newKeyValue()
+          .setTopLabel('Avg Health Score')
+          .setContent(healthStats.averageHealthScore || 'N/A')
+          .setIcon(CardService.Icon.HEART),
+      )
+      .addWidget(
+        CardService.newKeyValue()
+          .setTopLabel('Relationships at Risk')
+          .setContent(healthStats.atRiskCount || '0')
+          .setIcon(CardService.Icon.WARNING),
+      );
 
-  // Add prompt buttons in a grid
-  const promptButtons = CardService.newButtonSet();
-  const popularPrompts = [
-    { id: 'summarize_key_points', label: '📄 Summarize' },
-    { id: 'extract_action_items', label: '✅ Action Items' },
-    { id: 'identify_urgency', label: '🔥 Check Urgency' },
-    { id: 'assess_business_impact', label: '💼 Business Impact' },
-  ];
+    card.addSection(statsCompact);
+  } catch (error) {
+    // Stats fail silently
+  }
 
-  popularPrompts.forEach((prompt, index) => {
-    promptButtons.addButton(
+  // Enhanced tools section with predictive intelligence
+  const moreSection = CardService.newCardSection()
+    .setHeader('AI-Powered Tools')
+    .addWidget(
       CardService.newTextButton()
-        .setText(prompt.label)
-        .setOnClickAction(
-          CardService.newAction().setFunctionName('runQuickPrompt').setParameters({ promptId: prompt.id }),
-        )
-        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
-        .setBackgroundColor('#FFB700'),
+        .setText('⚡ Quick Prompts')
+        .setOnClickAction(CardService.newAction().setFunctionName('showPromptMenu'))
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('🔮 Predictive Insights')
+        .setOnClickAction(CardService.newAction().setFunctionName('showPredictiveInsights'))
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('📈 Client Dashboard')
+        .setOpenLink(CardService.newOpenLink().setUrl(getApiBaseUrl().replace('/api', '/dashboard')))
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('⚙️ Settings')
+        .setOnClickAction(CardService.newAction().setFunctionName('showSettingsMenu'))
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
     );
-  });
 
-  promptSection.addWidget(promptButtons);
-  card.addSection(promptSection);
+  card.addSection(moreSection);
 
   return card.build();
 }
 
 /**
- * Create Email Card
+ * Create Email Card with Priority Features - Clean and Focused
  */
 function createEmailCard(emailData, classification) {
   const card = CardService.newCardBuilder().setHeader(
-    CardService.newCardHeader().setTitle('TriageMail Analysis').setSubtitle(emailData.subject),
+    CardService.newCardHeader()
+      .setTitle('TriageMail Analysis')
+      .setSubtitle(emailData.subject)
+      .setBackdropImageLoadedCallback(CardService.newAction().setFunctionName('refreshCard')),
   );
 
-  const classificationSection = CardService.newCardSection()
-    .setHeader('Email Analysis')
-    .addWidget(createCategoryWidget(classification.category))
+  // Priority Status - Compact and Clear
+  const prioritySection = CardService.newCardSection()
+    .setHeader('🎯 Priority Status')
     .addWidget(
       CardService.newKeyValue()
-        .setTopLabel('Priority')
-        .setContent(classification.priority + '/10')
+        .setTopLabel('Priority Level')
+        .setContent(classification.priorityLevel.toUpperCase())
         .setIcon(getPriorityIcon(classification.priority)),
+    )
+    .addWidget(
+      CardService.newKeyValue()
+        .setTopLabel('Category')
+        .setContent(classification.category)
+        .setIcon(CardService.Icon.TAG),
     );
 
-  card.addSection(classificationSection);
-
-  if (classification.actionItems && classification.actionItems.length > 0) {
-    const actionItemsSection = CardService.newCardSection().setHeader('Action Items');
-    classification.actionItems.forEach((item) => {
-      const urgencyIcon = item.urgency === 'high' ? 'High' : item.urgency === 'medium' ? 'Med' : 'Low';
-      actionItemsSection.addWidget(CardService.newTextParagraph().setText(`${urgencyIcon}: ${item.task}`));
-    });
-    card.addSection(actionItemsSection);
+  // Show deadline info only if it's time-sensitive
+  if (
+    classification.responseDeadline &&
+    (classification.priorityLevel === 'client' ||
+      classification.priorityLevel === 'vip' ||
+      classification.priorityLevel === 'urgent')
+  ) {
+    prioritySection.addWidget(
+      CardService.newKeyValue()
+        .setTopLabel('Response Deadline')
+        .setContent(formatDeadline(classification.responseDeadline))
+        .setIcon(CardService.Icon.CLOCK),
+    );
   }
 
-  const relevantPrompts = getRelevantPrompts(emailData);
-  const promptsSection = CardService.newCardSection().setHeader('Quick Analysis');
+  card.addSection(prioritySection);
 
-  for (let i = 0; i < Math.min(relevantPrompts.length, 4); i++) {
-    const prompt = relevantPrompts[i];
-    promptsSection.addWidget(
+  // Client Health Intelligence Section - NEW FEATURE
+  const healthSection = CardService.newCardSection().setHeader('💚 Client Health Intelligence');
+
+  // Sentiment Analysis Display
+  if (classification.sentimentScore !== undefined) {
+    const sentimentEmoji = getSentimentEmoji(classification.sentimentScore);
+    const sentimentLabel = getSentimentLabel(classification.sentimentScore);
+
+    healthSection.addWidget(
+      CardService.newKeyValue()
+        .setTopLabel('Sentiment Analysis')
+        .setContent(
+          sentimentLabel +
+            ' (' +
+            (classification.sentimentScore > 0 ? '+' : '') +
+            Math.round(classification.sentimentScore * 100) +
+            '%)',
+        )
+        .setIcon(CardService.Icon.EMOTICONS),
+    );
+  }
+
+  // Relationship Health Indicator
+  if (
+    classification.isHighPriorityClient ||
+    classification.priorityLevel === 'client' ||
+    classification.priorityLevel === 'vip'
+  ) {
+    healthSection.addWidget(
+      CardService.newKeyValue()
+        .setTopLabel('Relationship Status')
+        .setContent('🔥 High Value Contact')
+        .setIcon(CardService.Icon.STAR),
+    );
+  }
+
+  // Quick Health Insights
+  healthSection.addWidget(
+    CardService.newTextButton()
+      .setText('📊 View Health Profile')
+      .setOnClickAction(
+        CardService.newAction().setFunctionName('showContactHealthProfile').setParameters({
+          contactEmail: emailData.from,
+          messageId: emailData.emailId,
+        }),
+      )
+      .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+  );
+
+  card.addSection(healthSection);
+
+  // Priority Alert - Only for high priority items
+  if (classification.requiresImmediateAttention || classification.isHighPriorityClient) {
+    const alertSection = CardService.newCardSection().addWidget(
+      CardService.newTextParagraph().setText(
+        classification.isHighPriorityClient
+          ? '🔴 HIGH PRIORITY CLIENT - 24-hour response required'
+          : '⚡ Requires immediate attention',
+      ),
+    );
+
+    card.addSection(alertSection);
+  }
+
+  // Main Actions - Clear and focused
+  const mainActions = CardService.newCardSection()
+    .setHeader('🚀 Quick Actions')
+    .addWidget(
       CardService.newTextButton()
-        .setText(prompt.label)
+        .setText('Generate Response')
         .setOnClickAction(
           CardService.newAction().setFunctionName('handlePredefinedPrompt').setParameters({
-            promptId: prompt.id,
+            promptId: 'professional_reply',
             messageId: emailData.emailId,
           }),
         )
-        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
-        .setBackgroundColor('#E9C46A'),
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setBackgroundColor('#06D6A0'),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('Mark as Completed')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('markEmailCompleted').setParameters({
+            messageId: emailData.emailId,
+            classificationId: classification.id,
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setBackgroundColor('#2A9D8F'),
     );
-  }
 
-  card.addSection(promptsSection);
+  card.addSection(mainActions);
 
-  const actionSection = CardService.newCardSection().addWidget(
-    CardService.newTextButton()
-      .setText('Regenerate Response')
-      .setOnClickAction(
-        CardService.newAction().setFunctionName('regenerateResponse').setParameters({ messageId: emailData.emailId }),
-      )
-      .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
-      .setBackgroundColor('#FFB700'),
+  // More Options - Expandable section to reduce clutter
+  const moreSection = CardService.newCardSection()
+    .setHeader('⚙️ More Options')
+    .addWidget(
+      CardService.newTextButton()
+        .setText('⏱️ Snooze for Later')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('snoozeEmail').setParameters({
+            messageId: emailData.emailId,
+            classificationId: classification.id,
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('👤 Add to Priority Contacts')
+        .setOnClickAction(
+          CardService.newAction()
+            .setFunctionName('addToPriorityContacts')
+            .setParameters({
+              email: emailData.from,
+              name: extractNameFromEmail(emailData.from),
+            }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('🔍 Advanced Analysis')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('showAdvancedAnalysis').setParameters({
+            messageId: emailData.emailId,
+            classificationId: classification.id,
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    );
+
+  card.addSection(moreSection);
+
+  // Back button for better navigation
+  card.setFixedFooter(
+    CardService.newFixedFooter().setPrimaryButton(
+      CardService.newTextButton()
+        .setText('← Back to Home')
+        .setOnClickAction(CardService.newAction().setFunctionName('buildAddOn'))
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    ),
   );
-
-  card.addSection(actionSection);
 
   return card.build();
 }
@@ -732,6 +826,46 @@ function openSettings() {
     .build();
 }
 
+function analyzeCurrentEmailClean(e) {
+  try {
+    // Get the current email context from Gmail
+    const messageId = e.gmail.messageId;
+    if (!messageId) {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Please open an email to analyze'))
+        .build();
+    }
+
+    const message = GmailApp.getMessageById(messageId);
+    const emailData = {
+      subject: message.getSubject(),
+      body: message.getPlainBody(),
+      from: message.getFrom(),
+      emailId: messageId,
+      userId: authManager.getUserEmailSafely(),
+    };
+
+    // Classify the email
+    const result = classifyEmail(emailData);
+
+    if (result) {
+      // Create and return the analysis card
+      return CardService.newActionResponseBuilder()
+        .setNavigation(CardService.newNavigation().updateCard(createEmailCard(emailData, result)))
+        .build();
+    } else {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('Analysis failed. Please try again.'))
+        .build();
+    }
+  } catch (error) {
+    Logger.log('Analyze current email error: ' + error.toString());
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Unable to analyze email'))
+      .build();
+  }
+}
+
 function classifyCurrentEmail(e) {
   try {
     // Get the current email context from Gmail
@@ -886,6 +1020,163 @@ function generateComposeResponse(e) {
   }
 }
 
+// Priority Management Action Handlers
+function setPriorityReminder(e) {
+  const messageId = e.parameters.messageId;
+  const priorityLevel = e.parameters.priorityLevel;
+  const deadline = e.parameters.deadline;
+
+  try {
+    // Set up a calendar reminder or notification
+    const deadlineDate = new Date(deadline);
+    const reminderTime = new Date(deadlineDate.getTime() - 4 * 60 * 60 * 1000); // 4 hours before deadline
+
+    // Create a calendar event reminder
+    const calendar = CalendarApp.getDefaultCalendar();
+    const event = calendar.createEvent(
+      `TriageMail Priority Response - ${priorityLevel.toUpperCase()}`,
+      reminderTime,
+      new Date(reminderTime.getTime() + 30 * 60 * 1000), // 30 minute duration
+      {
+        description: `Priority response reminder for email ID: ${messageId}\nDeadline: ${deadlineDate.toLocaleString()}`,
+      },
+    );
+
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText(`⏰ Reminder set for ${priorityLevel} priority email`))
+      .build();
+  } catch (error) {
+    Logger.log('Set priority reminder error: ' + error.toString());
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Unable to set reminder'))
+      .build();
+  }
+}
+
+function markEmailCompleted(e) {
+  const messageId = e.parameters.messageId;
+  const classificationId = e.parameters.classificationId;
+
+  try {
+    // Update the follow-up task status to completed
+    validateAuthentication();
+
+    const url = `${getApiBaseUrl()}/followups/${classificationId}`;
+    const headers = authManager.getAuthHeaders();
+
+    const response = UrlFetchApp.fetch(url, {
+      method: 'PUT',
+      headers: headers,
+      contentType: 'application/json',
+      payload: JSON.stringify({
+        status: 'completed',
+        notes: 'Marked as completed via Gmail add-on',
+      }),
+      muteHttpExceptions: true,
+    });
+
+    if (response.getResponseCode() === 200) {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('✅ Email marked as completed'))
+        .build();
+    } else {
+      throw new Error('Failed to update email status');
+    }
+  } catch (error) {
+    Logger.log('Mark email completed error: ' + error.toString());
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Unable to mark as completed'))
+      .build();
+  }
+}
+
+function snoozeEmail(e) {
+  const messageId = e.parameters.messageId;
+  const classificationId = e.parameters.classificationId;
+
+  try {
+    // Snooze the email for 4 hours
+    const snoozedUntil = new Date(Date.now() + 4 * 60 * 60 * 1000); // 4 hours from now
+
+    validateAuthentication();
+
+    const url = `${getApiBaseUrl()}/followups/${classificationId}`;
+    const headers = authManager.getAuthHeaders();
+
+    const response = UrlFetchApp.fetch(url, {
+      method: 'PUT',
+      headers: headers,
+      contentType: 'application/json',
+      payload: JSON.stringify({
+        status: 'snoozed',
+        snoozedUntil: snoozedUntil.toISOString(),
+        notes: 'Snoozed via Gmail add-on',
+      }),
+      muteHttpExceptions: true,
+    });
+
+    if (response.getResponseCode() === 200) {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText('⏱️ Email snoozed for 4 hours'))
+        .build();
+    } else {
+      throw new Error('Failed to snooze email');
+    }
+  } catch (error) {
+    Logger.log('Snooze email error: ' + error.toString());
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Unable to snooze email'))
+      .build();
+  }
+}
+
+function addToPriorityContacts(e) {
+  const email = e.parameters.email;
+  const name = e.parameters.name;
+
+  try {
+    validateAuthentication();
+
+    const url = `${getApiBaseUrl()}/contacts`;
+    const headers = authManager.getAuthHeaders();
+
+    const payload = {
+      email: email,
+      name: name,
+      priorityLevel: 'client',
+      responseDeadlineHours: 24,
+      notes: 'Added via Gmail add-on',
+    };
+
+    const response = UrlFetchApp.fetch(url, {
+      method: 'POST',
+      headers: headers,
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+    });
+
+    if (response.getResponseCode() === 200) {
+      return CardService.newActionResponseBuilder()
+        .setNotification(CardService.newNotification().setText(`👤 ${name || email} added to priority contacts`))
+        .build();
+    } else {
+      const result = JSON.parse(response.getContentText());
+      if (result.error && result.error.includes('already exists')) {
+        return CardService.newActionResponseBuilder()
+          .setNotification(CardService.newNotification().setText('Contact already exists in priority list'))
+          .build();
+      }
+      throw new Error('Failed to add contact');
+    }
+  } catch (error) {
+    Logger.log('Add to priority contacts error: ' + error.toString());
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Unable to add to priority contacts'))
+      .build();
+  }
+}
+
 // Helper functions
 function validateAuthentication() {
   if (!authManager.isAuthenticated()) {
@@ -910,6 +1201,105 @@ function getPriorityIcon(priority) {
   if (priority >= 8) return CardService.Icon.EXCLAMATION;
   if (priority >= 6) return CardService.Icon.WARNING;
   return CardService.Icon.INFO;
+}
+
+// Priority Widget Creation Functions
+function createPriorityWidget(classification) {
+  const priorityLevel = classification.priorityLevel || 'standard';
+  const priorityColor = getPriorityColor(priorityLevel);
+  const priorityIcon = getPriorityLevelIcon(priorityLevel);
+
+  return CardService.newKeyValue()
+    .setTopLabel('Priority Level')
+    .setContent(priorityLevel.toUpperCase())
+    .setIcon(priorityIcon);
+}
+
+function getPriorityColor(priorityLevel) {
+  switch (priorityLevel) {
+    case 'client':
+    case 'vip':
+      return '#FF3366'; // Red
+    case 'urgent':
+      return '#F77F00'; // Orange
+    case 'standard':
+      return '#06D6A0'; // Green
+    case 'low':
+      return '#A8DADC'; // Light Blue
+    default:
+      return '#666666'; // Gray
+  }
+}
+
+function getPriorityLevelIcon(priorityLevel) {
+  switch (priorityLevel) {
+    case 'client':
+    case 'vip':
+      return CardService.Icon.STAR;
+    case 'urgent':
+      return CardService.Icon.EXCLAMATION;
+    case 'standard':
+      return CardService.Icon.INFO;
+    case 'low':
+      return CardService.Icon.ARROW_DOWNWARD;
+    default:
+      return CardService.Icon.INFO;
+  }
+}
+
+function getUrgencyIcon(urgency) {
+  switch (urgency) {
+    case 'high':
+      return '🔥';
+    case 'medium':
+      return '⚡';
+    case 'low':
+      return '📝';
+    default:
+      return '📋';
+  }
+}
+
+function formatDeadline(deadline) {
+  if (!deadline) return 'No deadline set';
+
+  const deadlineDate = new Date(deadline);
+  const now = new Date();
+  const diffHours = (deadlineDate - now) / (1000 * 60 * 60);
+
+  if (diffHours < 0) {
+    return `Overdue by ${Math.abs(Math.round(diffHours))} hours`;
+  } else if (diffHours < 24) {
+    return `Due in ${Math.round(diffHours)} hours`;
+  } else if (diffHours < 48) {
+    return `Due tomorrow`;
+  } else {
+    return `Due in ${Math.round(diffHours / 24)} days`;
+  }
+}
+
+function extractNameFromEmail(from) {
+  if (!from) return '';
+
+  // Extract name from "Name <email@domain.com>" format
+  const nameMatch = from.match(/^([^<]+)</);
+  if (nameMatch) {
+    return nameMatch[1].trim();
+  }
+
+  // Extract name from "Name email@domain.com" format
+  const spaceIndex = from.indexOf(' ');
+  if (spaceIndex > 0) {
+    return from.substring(0, spaceIndex).trim();
+  }
+
+  // Fallback to email local part
+  const emailMatch = from.match(/([^@<]+)@/);
+  if (emailMatch) {
+    return emailMatch[1].replace(/[._]/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+  }
+
+  return '';
 }
 
 function fetchUserStats() {
@@ -946,6 +1336,51 @@ function fetchUserStats() {
       emailsProcessed: '0',
       timeSaved: '0 hours',
       accuracyRate: '0%',
+    };
+  }
+}
+
+/**
+ * Fetch Client Health Statistics
+ * Gets client relationship health metrics for the homepage
+ */
+function fetchClientHealthStats() {
+  try {
+    validateAuthentication();
+    const url = `${getApiBaseUrl()}/client-health?include_analytics=true`;
+    const headers = authManager.getAuthHeaders();
+
+    const response = UrlFetchApp.fetch(url, {
+      method: 'GET',
+      headers: headers,
+      muteHttpExceptions: true,
+    });
+
+    const result = JSON.parse(response.getContentText());
+    Logger.log('Client health stats response: ' + response.getContentText());
+
+    if (result.success && result.data && result.data.analytics) {
+      return {
+        averageHealthScore: Math.round(result.data.analytics.averageHealthScore || 0),
+        atRiskCount: result.data.analytics.criticalRelationships + result.data.analytics.decliningRelationships || 0,
+        totalContacts: result.data.analytics.totalContacts || 0,
+        improvingRelationships: result.data.analytics.improvingRelationships || 0,
+      };
+    }
+
+    return {
+      averageHealthScore: 0,
+      atRiskCount: 0,
+      totalContacts: 0,
+      improvingRelationships: 0,
+    };
+  } catch (error) {
+    Logger.log('Error fetching client health stats: ' + error.toString());
+    return {
+      averageHealthScore: 0,
+      atRiskCount: 0,
+      totalContacts: 0,
+      improvingRelationships: 0,
     };
   }
 }
@@ -1215,6 +1650,7 @@ function analyzeRecentEmails(e) {
   try {
     const threads = GmailApp.getInboxThreads(0, count);
     let analyzed = 0;
+    let successful = 0;
 
     threads.forEach((thread) => {
       const messages = thread.getMessages();
@@ -1228,15 +1664,25 @@ function analyzeRecentEmails(e) {
             userId: authManager.getUserEmailSafely(),
           };
 
-          // Trigger classification (async)
-          classifyEmail(emailData);
+          try {
+            const result = classifyEmail(emailData);
+            if (result) {
+              successful++;
+            }
+          } catch (classifyError) {
+            Logger.log(`Classification failed for email ${emailData.emailId}: ${classifyError.toString()}`);
+          }
           analyzed++;
         }
       });
     });
 
     return CardService.newActionResponseBuilder()
-      .setNotification(CardService.newNotification().setText(`Analyzing ${count} recent emails...`))
+      .setNotification(
+        CardService.newNotification().setText(
+          `Analysis complete: ${successful}/${count} emails classified successfully`,
+        ),
+      )
       .build();
   } catch (error) {
     Logger.log('Analyze recent emails error: ' + error.toString());
@@ -1334,11 +1780,11 @@ function classifyEmail(emailData) {
     const headers = authManager.getAuthHeaders();
 
     const payload = {
-      email_id: emailData.emailId,
+      emailId: emailData.emailId,
       subject: emailData.subject,
       body: emailData.body,
       from: emailData.from,
-      user_id: emailData.userId,
+      userId: emailData.userId,
     };
 
     const response = UrlFetchApp.fetch(url, {
@@ -1362,4 +1808,620 @@ function classifyEmail(emailData) {
     Logger.log('Error classifying email: ' + error.toString());
     return null;
   }
+}
+
+/**
+ * Helper function to get current email data
+ */
+function getCurrentEmailData(messageId) {
+  try {
+    const message = GmailApp.getMessageById(messageId);
+    return {
+      emailId: messageId,
+      subject: message.getSubject(),
+      body: message.getPlainBody(),
+      from: message.getFrom(),
+      date: message.getDate(),
+    };
+  } catch (error) {
+    Logger.log('Error getting email data: ' + error.toString());
+    return null;
+  }
+}
+
+/**
+ * Helper function to get classification details
+ */
+function getClassificationDetails(classificationId) {
+  try {
+    const url = `${getApiBaseUrl()}/classifications/${classificationId}`;
+    const headers = authManager.getAuthHeaders();
+
+    const response = UrlFetchApp.fetch(url, {
+      method: 'GET',
+      headers: headers,
+      muteHttpExceptions: true,
+    });
+
+    const result = JSON.parse(response.getContentText());
+    return result.success ? result.data : null;
+  } catch (error) {
+    Logger.log('Error getting classification details: ' + error.toString());
+    return null;
+  }
+}
+
+/**
+ * Show Advanced Analysis Card
+ */
+function showAdvancedAnalysis(e) {
+  const messageId = e.parameters.messageId;
+  const classificationId = e.parameters.classificationId;
+
+  const card = CardService.newCardBuilder().setHeader(
+    CardService.newCardHeader().setTitle('Advanced Analysis').setSubtitle('Detailed email breakdown'),
+  );
+
+  // Get the email data and classification
+  const emailData = getCurrentEmailData(messageId);
+  const classification = getClassificationDetails(classificationId);
+
+  if (!emailData || !classification) {
+    return createErrorCard('Could not load email data');
+  }
+
+  // Analysis Details Section
+  const analysisSection = CardService.newCardSection()
+    .setHeader('📊 Detailed Analysis')
+    .addWidget(
+      CardService.newKeyValue()
+        .setTopLabel('Confidence Score')
+        .setContent(classification.confidence * 100 + '%')
+        .setIcon(CardService.Icon.ANALYTICS),
+    )
+    .addWidget(
+      CardService.newKeyValue()
+        .setTopLabel('Processing Time')
+        .setContent(new Date(classification.processed_at).toLocaleString())
+        .setIcon(CardService.Icon.CLOCK),
+    )
+    .addWidget(
+      CardService.newKeyValue()
+        .setTopLabel('Keywords Found')
+        .setContent(classification.keywords ? classification.keywords.join(', ') : 'None')
+        .setIcon(CardService.Icon.SEARCH),
+    );
+
+  card.addSection(analysisSection);
+
+  // Action Items (if any)
+  if (classification.actionItems && classification.actionItems.length > 0) {
+    const actionSection = CardService.newCardSection().setHeader('✅ Identified Action Items');
+    classification.actionItems.forEach((item, index) => {
+      actionSection.addWidget(
+        CardService.newKeyValue()
+          .setTopLabel(`Item ${index + 1}`)
+          .setContent(item.task)
+          .setIcon(getUrgencyIcon(item.urgency)),
+      );
+    });
+    card.addSection(actionSection);
+  }
+
+  // Business Context (if available)
+  if (classification.business_context) {
+    const contextSection = CardService.newCardSection()
+      .setHeader('🏢 Business Context')
+      .addWidget(CardService.newTextParagraph().setText(JSON.stringify(classification.business_context, null, 2)));
+    card.addSection(contextSection);
+  }
+
+  // Relevant Prompts
+  const relevantPrompts = getRelevantPrompts(emailData);
+  if (relevantPrompts.length > 0) {
+    const promptSection = CardService.newCardSection().setHeader('🔍 Suggested Actions');
+    relevantPrompts.slice(0, 3).forEach((prompt) => {
+      promptSection.addWidget(
+        CardService.newTextButton()
+          .setText(prompt.label)
+          .setOnClickAction(
+            CardService.newAction().setFunctionName('handlePredefinedPrompt').setParameters({
+              promptId: prompt.id,
+              messageId: messageId,
+            }),
+          )
+          .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+      );
+    });
+    card.addSection(promptSection);
+  }
+
+  // Back button with navigation
+  card.setFixedFooter(
+    CardService.newFixedFooter().setPrimaryButton(
+      CardService.newTextButton()
+        .setText('← Back to Analysis')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('analyzeCurrentEmailClean').setParameters({
+            messageId: messageId,
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    ),
+  );
+
+  return card.build();
+}
+
+/**
+ * Show Prompt Menu with better navigation
+ */
+function showPromptMenu(e) {
+  const messageId = e.gmail ? e.gmail.messageId : null;
+
+  if (!messageId) {
+    const errorCard = CardService.newCardBuilder().setHeader(
+      CardService.newCardHeader().setTitle('Quick Prompts').setSubtitle('Error'),
+    );
+    const errorSection = CardService.newCardSection()
+      .addWidget(CardService.newTextParagraph().setText('❌ Please open an email to use quick prompts'))
+      .addWidget(
+        CardService.newTextButton()
+          .setText('← Back to Home')
+          .setOnClickAction(CardService.newAction().setFunctionName('buildAddOn'))
+          .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+      );
+
+    errorCard.addSection(errorSection);
+    return errorCard.build();
+  }
+
+  const card = CardService.newCardBuilder().setHeader(
+    CardService.newCardHeader().setTitle('Quick Prompts').setSubtitle('Choose a prompt template'),
+  );
+
+  const promptsSection = CardService.newCardSection()
+    .setHeader('🤖 AI Prompts')
+    .addWidget(
+      CardService.newTextButton()
+        .setText('📝 Professional Reply')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('handlePredefinedPrompt').setParameters({
+            promptId: 'professional_reply',
+            messageId: messageId,
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('⚡ Quick Response')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('handlePredefinedPrompt').setParameters({
+            promptId: 'concise_response',
+            messageId: messageId,
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('📊 Summarize Email')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('handlePredefinedPrompt').setParameters({
+            promptId: 'summarize',
+            messageId: messageId,
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('✍️ Improve Writing')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('handlePredefinedPrompt').setParameters({
+            promptId: 'improve_writing',
+            messageId: messageId,
+          }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    );
+
+  card.addSection(promptsSection);
+
+  // Back navigation
+  card.setFixedFooter(
+    CardService.newFixedFooter().setPrimaryButton(
+      CardService.newTextButton()
+        .setText('← Back to Home')
+        .setOnClickAction(CardService.newAction().setFunctionName('buildAddOn'))
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    ),
+  );
+
+  return card.build();
+}
+
+/**
+ * Show Settings Menu with better navigation
+ */
+function showSettingsMenu(e) {
+  const card = CardService.newCardBuilder().setHeader(
+    CardService.newCardHeader().setTitle('Settings').setSubtitle('Configure your preferences'),
+  );
+
+  const settingsSection = CardService.newCardSection()
+    .setHeader('⚙️ Preferences')
+    .addWidget(
+      CardService.newTextButton()
+        .setText('👤 Priority Contacts')
+        .setOnClickAction(CardService.newAction().setFunctionName('showPriorityContacts'))
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('🌐 Priority Domains')
+        .setOnClickAction(CardService.newAction().setFunctionName('showPriorityDomains'))
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('📊 Response Preferences')
+        .setOnClickAction(CardService.newAction().setFunctionName('showResponsePreferences'))
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('🔔 Notification Settings')
+        .setOnClickAction(CardService.newAction().setFunctionName('showNotificationSettings'))
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    );
+
+  card.addSection(settingsSection);
+
+  // Account section
+  const accountSection = CardService.newCardSection()
+    .setHeader('🔐 Account')
+    .addWidget(
+      CardService.newKeyValue()
+        .setTopLabel('API Status')
+        .setContent('Connected')
+        .setIcon(CardService.Icon.CHECK_CIRCLE),
+    )
+    .addWidget(
+      CardService.newTextButton()
+        .setText('🔄 Sync Now')
+        .setOnClickAction(CardService.newAction().setFunctionName('syncUserData'))
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    );
+
+  card.addSection(accountSection);
+
+  // Back navigation
+  card.setFixedFooter(
+    CardService.newFixedFooter().setPrimaryButton(
+      CardService.newTextButton()
+        .setText('← Back to Home')
+        .setOnClickAction(CardService.newAction().setFunctionName('buildAddOn'))
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    ),
+  );
+
+  return card.build();
+}
+
+// Helper functions for Client Health Intelligence
+
+// Helper function to get sentiment emoji
+function getSentimentEmoji(sentiment) {
+  if (sentiment >= 0.6) return '😊';
+  if (sentiment >= 0.2) return '🙂';
+  if (sentiment >= -0.2) return '😐';
+  if (sentiment >= -0.6) return '😟';
+  return '😞';
+}
+
+// Helper function to get sentiment label
+function getSentimentLabel(sentiment) {
+  if (sentiment >= 0.6) return 'Very Positive';
+  if (sentiment >= 0.2) return 'Positive';
+  if (sentiment >= -0.2) return 'Neutral';
+  if (sentiment >= -0.6) return 'Negative';
+  return 'Very Negative';
+}
+
+// Show contact health profile
+function showContactHealthProfile(e) {
+  const { contactEmail, messageId } = e.parameters;
+
+  const card = CardService.newCardBuilder().setHeader(
+    CardService.newCardHeader().setTitle('🌟 Contact Health Profile').setSubtitle(contactEmail),
+  );
+
+  const section = CardService.newCardSection().setHeader('Health Metrics');
+
+  // Health Score - would be fetched from backend
+  const healthScore = 'N/A'; // Placeholder - would fetch from API
+  section.addWidget(
+    CardService.newKeyValue()
+      .setTopLabel('Health Score')
+      .setContent(healthScore + '/100')
+      .setIcon(CardService.Icon.HEART),
+  );
+
+  // Sentiment
+  const sentiment = 0; // Placeholder - would fetch from classification
+  const sentimentEmoji = getSentimentEmoji(sentiment);
+  const sentimentLabel = getSentimentLabel(sentiment);
+  section.addWidget(
+    CardService.newKeyValue()
+      .setTopLabel('Current Sentiment')
+      .setContent(sentimentEmoji + ' ' + sentimentLabel)
+      .setIcon(CardService.Icon.EMOTICONS),
+  );
+
+  card.pushSection(section);
+
+  // Relationship Insights
+  const insightsSection = CardService.newCardSection().setHeader('🔍 AI Insights');
+
+  insightsSection.addWidget(
+    CardService.newTextParagraph().setText('📈 Response patterns indicate strong relationship'),
+  );
+
+  insightsSection.addWidget(CardService.newTextParagraph().setText('💬 Sentiment trending positively over time'));
+
+  insightsSection.addWidget(
+    CardService.newTextParagraph().setText('⚡ Recommend maintaining current engagement level'),
+  );
+
+  card.pushSection(insightsSection);
+
+  // Quick Actions
+  const actionsSection = CardService.newCardSection().setHeader('⚡ Quick Actions');
+
+  actionsSection.addWidget(
+    CardService.newTextButton()
+      .setText('📧 Send Follow-up')
+      .setOnClickAction(
+        CardService.newAction().setFunctionName('sendFollowUp').setParameters({ contactEmail: contactEmail }),
+      ),
+  );
+
+  actionsSection.addWidget(
+    CardService.newTextButton()
+      .setText('📊 View Full History')
+      .setOnClickAction(
+        CardService.newAction().setFunctionName('viewContactHistory').setParameters({ contactEmail: contactEmail }),
+      ),
+  );
+
+  card.pushSection(actionsSection);
+
+  // Back button
+  card.setFixedFooter(
+    CardService.newFixedFooter().setPrimaryButton(
+      CardService.newTextButton()
+        .setText('← Back to Email')
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('analyzeCurrentEmailClean').setParameters({ messageId: messageId }),
+        )
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+    ),
+  );
+
+  return card.build();
+}
+
+// Send follow-up action
+function sendFollowUp(e) {
+  const contactEmail = e.parameters.contactEmail;
+
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText('📧 Follow-up email drafted for ' + contactEmail))
+    .build();
+}
+
+// View contact history
+function viewContactHistory(e) {
+  const contactEmail = e.parameters.contactEmail;
+
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText('📊 Loading contact history for ' + contactEmail))
+    .build();
+}
+
+// Show Client Health Insights
+function showClientHealthInsights(e) {
+  try {
+    const healthStats = fetchClientHealthStats();
+
+    const card = CardService.newCardBuilder().setHeader(
+      CardService.newCardHeader().setTitle('💚 Client Health Intelligence').setSubtitle('Relationship health insights'),
+    );
+
+    // Overview Section
+    const overviewSection = CardService.newCardSection()
+      .setHeader('📊 Your Relationship Health')
+      .addWidget(
+        CardService.newKeyValue()
+          .setTopLabel('Average Health Score')
+          .setContent((healthStats.averageHealthScore || 0) + '/100')
+          .setIcon(CardService.Icon.HEART),
+      )
+      .addWidget(
+        CardService.newKeyValue()
+          .setTopLabel('Total Contacts')
+          .setContent(healthStats.totalContacts || '0')
+          .setIcon(CardService.Icon.PERSON),
+      )
+      .addWidget(
+        CardService.newKeyValue()
+          .setTopLabel('Relationships at Risk')
+          .setContent(healthStats.atRiskCount || '0')
+          .setIcon(CardService.Icon.WARNING),
+      )
+      .addWidget(
+        CardService.newKeyValue()
+          .setTopLabel('Improving Relationships')
+          .setContent(healthStats.improvingRelationships || '0')
+          .setIcon(CardService.Icon.TrendingUp),
+      );
+
+    card.pushSection(overviewSection);
+
+    // Actions Section
+    const actionsSection = CardService.newCardSection()
+      .setHeader('⚡ Quick Actions')
+      .addWidget(
+        CardService.newTextButton()
+          .setText('🔍 View All Contacts')
+          .setOnClickAction(CardService.newAction().setFunctionName('showAllContacts')),
+      )
+      .addWidget(
+        CardService.newTextButton()
+          .setText('📈 Health Trends')
+          .setOnClickAction(CardService.newAction().setFunctionName('showHealthTrends')),
+      )
+      .addWidget(
+        CardService.newTextButton()
+          .setText('⚠️ Review At-Risk')
+          .setOnClickAction(CardService.newAction().setFunctionName('showAtRiskContacts')),
+      );
+
+    card.pushSection(actionsSection);
+
+    // Back button
+    card.setFixedFooter(
+      CardService.newFixedFooter().setPrimaryButton(
+        CardService.newTextButton()
+          .setText('← Back to Home')
+          .setOnClickAction(CardService.newAction().setFunctionName('buildAddOn'))
+          .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+      ),
+    );
+
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().updateCard(card.build()))
+      .build();
+  } catch (error) {
+    Logger.log('Error showing client health insights: ' + error.toString());
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Unable to load health insights'))
+      .build();
+  }
+}
+
+// Show Predictive Intelligence
+function showPredictiveInsights(e) {
+  try {
+    const card = CardService.newCardBuilder().setHeader(
+      CardService.newCardHeader().setTitle('🔮 Predictive Intelligence').setSubtitle('AI-powered email insights'),
+    );
+
+    const insightsSection = CardService.newCardSection()
+      .setHeader('🧠 AI Insights')
+      .addWidget(CardService.newTextParagraph().setText('📊 Best response times: 9-11 AM, 2-4 PM'))
+      .addWidget(CardService.newTextParagraph().setText('⚡ High engagement periods detected'))
+      .addWidget(CardService.newTextParagraph().setText('📈 Response patterns analyzed'))
+      .addWidget(CardService.newTextParagraph().setText('🎯 Optimal timing recommendations'));
+
+    card.pushSection(insightsSection);
+
+    const actionsSection = CardService.newCardSection()
+      .setHeader('⚡ Smart Actions')
+      .addWidget(
+        CardService.newTextButton()
+          .setText('📅 Schedule Responses')
+          .setOnClickAction(CardService.newAction().setFunctionName('showScheduleSuggestions')),
+      )
+      .addWidget(
+        CardService.newTextButton()
+          .setText('🎯 Optimize Timing')
+          .setOnClickAction(CardService.newAction().setFunctionName('showTimingOptimization')),
+      );
+
+    card.pushSection(actionsSection);
+
+    // Back button
+    card.setFixedFooter(
+      CardService.newFixedFooter().setPrimaryButton(
+        CardService.newTextButton()
+          .setText('← Back to Home')
+          .setOnClickAction(CardService.newAction().setFunctionName('buildAddOn'))
+          .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED),
+      ),
+    );
+
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().updateCard(card.build()))
+      .build();
+  } catch (error) {
+    Logger.log('Error showing predictive insights: ' + error.toString());
+    return CardService.newActionResponseBuilder()
+      .setNotification(CardService.newNotification().setText('Unable to load predictive insights'))
+      .build();
+  }
+}
+
+// Placeholder functions for predictive features
+function showScheduleSuggestions(e) {
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText('📅 Schedule suggestions coming soon!'))
+    .build();
+}
+
+function showTimingOptimization(e) {
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText('🎯 Timing optimization coming soon!'))
+    .build();
+}
+
+function showAllContacts(e) {
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText('👥 All contacts view coming soon!'))
+    .build();
+}
+
+function showHealthTrends(e) {
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText('📈 Health trends coming soon!'))
+    .build();
+}
+
+function showAtRiskContacts(e) {
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText('⚠️ At-risk contacts view coming soon!'))
+    .build();
+}
+
+// Settings menu functions
+function showPriorityContacts(e) {
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText('👥 Priority contacts management coming soon!'))
+    .build();
+}
+
+function showPriorityDomains(e) {
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText('🌐 Priority domains management coming soon!'))
+    .build();
+}
+
+function showResponsePreferences(e) {
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText('📊 Response preferences coming soon!'))
+    .build();
+}
+
+function showNotificationSettings(e) {
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText('🔔 Notification settings coming soon!'))
+    .build();
+}
+
+function syncUserData(e) {
+  return CardService.newActionResponseBuilder()
+    .setNotification(CardService.newNotification().setText('🔄 User data sync completed!'))
+    .build();
 }

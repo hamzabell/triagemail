@@ -4,6 +4,37 @@ interface EmailData {
   from: string;
   userId: string;
   emailId: string;
+  // Priority context for enhanced classification
+  priorityContacts?: PriorityContact[];
+  priorityDomains?: PriorityDomain[];
+  userPreferences?: UserPreferences;
+}
+
+interface PriorityContact {
+  email: string;
+  name?: string;
+  company?: string;
+  priorityLevel: 'client' | 'vip' | 'standard' | 'low';
+  responseDeadlineHours: number;
+  isActive: boolean;
+}
+
+interface PriorityDomain {
+  domain: string;
+  companyName?: string;
+  priorityLevel: 'client' | 'vip' | 'standard' | 'low';
+  responseDeadlineHours: number;
+  isActive: boolean;
+}
+
+interface UserPreferences {
+  clientDeadlineHours: number;
+  urgentDeadlineHours: number;
+  standardDeadlineHours: number;
+  lowDeadlineHours: number;
+  enableEscalationEmails: boolean;
+  enableReminderEmails: boolean;
+  reminderHoursBefore: number;
 }
 
 interface ActionItem {
@@ -24,6 +55,8 @@ interface BusinessContext {
   role?: string;
   communicationType: 'internal' | 'external' | 'customer' | 'partner';
   businessImpact: 'high' | 'medium' | 'low';
+  sentiment?: number; // -1 to 1 sentiment score
+  sentimentIndicators?: string[]; // Key emotional indicators
 }
 
 interface QuickAction {
@@ -55,6 +88,17 @@ interface ClassificationResult {
   businessPriority: number; // 1-10 business impact
   followUpRequired: boolean;
   responseComplexity: 'simple' | 'moderate' | 'complex';
+
+  // Client Health & Sentiment features
+  sentimentScore: number; // -1 to 1 sentiment score
+  emotionalIndicators: string[]; // Key emotions detected
+
+  // Priority tiering system
+  priorityLevel: 'client' | 'vip' | 'urgent' | 'standard' | 'low';
+  responseDeadlineHours: number;
+  responseDeadline: string;
+  isHighPriorityClient: boolean;
+  requiresImmediateAttention: boolean;
 }
 
 interface ResponseData {
@@ -95,14 +139,137 @@ export class AIService {
     }
   }
 
+  /**
+   * Determine priority tier based on contact/domain rules and content analysis
+   */
+  private determinePriorityTier(emailData: EmailData): 'client' | 'vip' | 'urgent' | 'standard' | 'low' {
+    const senderEmail = emailData.from.toLowerCase();
+    const senderDomain = senderEmail.split('@')[1];
+
+    // Check for priority contacts first
+    const priorityContact = emailData.priorityContacts?.find(
+      (contact) => contact.email.toLowerCase() === senderEmail && contact.isActive,
+    );
+
+    if (priorityContact) {
+      return priorityContact.priorityLevel;
+    }
+
+    // Check for priority domains
+    const priorityDomain = emailData.priorityDomains?.find(
+      (domain) => domain.domain.toLowerCase() === senderDomain && domain.isActive,
+    );
+
+    if (priorityDomain) {
+      return priorityDomain.priorityLevel;
+    }
+
+    // Default logic based on content analysis
+    const urgentKeywords = [
+      'urgent',
+      'asap',
+      'immediately',
+      'emergency',
+      'critical',
+      'deadline',
+      'today',
+      'tomorrow',
+      'as soon as possible',
+      'time sensitive',
+    ];
+
+    const vipKeywords = [
+      'ceo',
+      'executive',
+      'board',
+      'director',
+      'manager',
+      'partner',
+      'investor',
+      'client',
+      'customer',
+    ];
+
+    const subject = emailData.subject.toLowerCase();
+    const body = emailData.body.toLowerCase();
+    const content = `${subject} ${body}`;
+
+    // Check for urgent content
+    if (urgentKeywords.some((keyword) => content.includes(keyword))) {
+      return 'urgent';
+    }
+
+    // Check for VIP content
+    if (vipKeywords.some((keyword) => content.includes(keyword))) {
+      return 'vip';
+    }
+
+    // Default to standard
+    return 'standard';
+  }
+
+  /**
+   * Calculate response deadline hours based on priority tier and user preferences
+   */
+  private calculateResponseDeadline(
+    priorityTier: 'client' | 'vip' | 'urgent' | 'standard' | 'low',
+    userPreferences?: UserPreferences,
+  ): number {
+    const defaults = {
+      client: 24,
+      vip: 12,
+      urgent: 6,
+      standard: 72,
+      low: 168,
+    };
+
+    if (userPreferences) {
+      switch (priorityTier) {
+        case 'client':
+          return userPreferences.clientDeadlineHours || defaults.client;
+        case 'vip':
+        case 'urgent':
+          return userPreferences.urgentDeadlineHours || defaults.urgent;
+        case 'standard':
+          return userPreferences.standardDeadlineHours || defaults.standard;
+        case 'low':
+          return userPreferences.lowDeadlineHours || defaults.low;
+      }
+    }
+
+    return defaults[priorityTier];
+  }
+
+  /**
+   * Calculate deadline timestamp from hours
+   */
+  private calculateDeadlineTimestamp(hours: number): string {
+    const deadline = new Date();
+    deadline.setHours(deadline.getHours() + hours);
+    return deadline.toISOString();
+  }
+
   async classifyEmail(emailData: EmailData): Promise<ClassificationResult> {
     try {
+      // Priority tiering logic
+      const priorityTier = this.determinePriorityTier(emailData);
+      const responseDeadlineHours = this.calculateResponseDeadline(priorityTier, emailData.userPreferences);
+      const responseDeadline = this.calculateDeadlineTimestamp(responseDeadlineHours);
+      const isHighPriorityClient = priorityTier === 'client' || priorityTier === 'vip';
+      const requiresImmediateAttention = isHighPriorityClient || priorityTier === 'urgent';
+
       const prompt = `
         Analyze the following email comprehensively to provide business-focused intelligence:
 
         Email Subject: ${emailData.subject}
         Email Body: ${emailData.body}
         From: ${emailData.from}
+
+        PRIORITY CONTEXT:
+        - Priority Level: ${priorityTier}
+        - Response Required Within: ${responseDeadlineHours} hours
+        - High Priority Client: ${isHighPriorityClient}
+        - Deadline: ${responseDeadline}
 
         CLASSIFICATION CATEGORIES:
         - Urgent: Requires immediate attention (time-sensitive, critical issues, potential revenue impact)
@@ -147,6 +314,22 @@ export class AIService {
         - Follow-up Required: Will this need future attention?
         - Response Complexity: How complex will the response be?
 
+        6. SENTIMENT ANALYSIS (NEW):
+        - Analyze the emotional tone and sentiment of the email
+        - Provide sentiment score from -1 (very negative) to +1 (very positive)
+        - Identify key emotional indicators (positive, negative, neutral)
+        - Note any relationship-critical language
+
+        PRIORITY AWARENESS:
+        - This email requires response within ${responseDeadlineHours} hours
+        - ${isHighPriorityClient ? 'HIGH PRIORITY CLIENT - Immediate attention required' : 'Standard priority level'}
+        - Deadline: ${responseDeadline}
+
+        CLIENT HEALTH INTELLIGENCE:
+        - This analysis will be used to calculate client health scores
+        - Response time patterns will be tracked for predictive intelligence
+        - Sentiment trends will be monitored for relationship health
+
         Respond with JSON only in this format:
         {
           "category": "Urgent|Request|Question|Update|Spam",
@@ -172,7 +355,9 @@ export class AIService {
             "industry": "industry_name or null",
             "role": "professional_context or null",
             "communicationType": "internal|external|customer|partner",
-            "businessImpact": "high|medium|low"
+            "businessImpact": "high|medium|low",
+            "sentiment": number, // -1 to 1 sentiment score
+            "sentimentIndicators": ["positive", "negative", "neutral indicators found"]
           },
           "quickActions": [
             {
@@ -187,7 +372,9 @@ export class AIService {
           "estimatedTime": number,
           "businessPriority": number,
           "followUpRequired": true|false,
-          "responseComplexity": "simple|moderate|complex"
+          "responseComplexity": "simple|moderate|complex",
+          "sentimentScore": number, // Overall sentiment -1 to 1
+          "emotionalIndicators": ["emotion1", "emotion2"] // Key emotions detected
         }
       `;
 
@@ -256,6 +443,8 @@ export class AIService {
           role: result.businessContext?.role || null,
           communicationType: result.businessContext?.communicationType || 'external',
           businessImpact: result.businessContext?.businessImpact || 'medium',
+          sentiment: result.businessContext?.sentiment || 0,
+          sentimentIndicators: result.businessContext?.sentimentIndicators || [],
         },
 
         quickActions: Array.isArray(result.quickActions)
@@ -278,6 +467,17 @@ export class AIService {
         businessPriority: Math.min(10, Math.max(1, result.businessPriority || result.priority || 5)),
         followUpRequired: result.followUpRequired || false,
         responseComplexity: result.responseComplexity || 'moderate',
+
+        // Client Health & Sentiment features
+        sentimentScore: Math.max(-1, Math.min(1, result.sentimentScore || 0)),
+        emotionalIndicators: Array.isArray(result.emotionalIndicators) ? result.emotionalIndicators : [],
+
+        // Priority tiering system
+        priorityLevel: priorityTier,
+        responseDeadlineHours: responseDeadlineHours,
+        responseDeadline: responseDeadline,
+        isHighPriorityClient: isHighPriorityClient,
+        requiresImmediateAttention: requiresImmediateAttention,
       };
 
       return enhancedResult;
@@ -285,6 +485,11 @@ export class AIService {
       console.error('AI classification error:', error);
 
       // Fallback classification with enhanced structure
+      const fallbackTier = this.determinePriorityTier(emailData);
+      const fallbackDeadlineHours = this.calculateResponseDeadline(fallbackTier, emailData.userPreferences);
+      const fallbackDeadline = this.calculateDeadlineTimestamp(fallbackDeadlineHours);
+      const isHighPriorityClient = fallbackTier === 'client' || fallbackTier === 'vip';
+
       return {
         category: 'Update',
         priority: 5,
@@ -295,6 +500,8 @@ export class AIService {
         businessContext: {
           communicationType: 'external',
           businessImpact: 'medium',
+          sentiment: 0,
+          sentimentIndicators: [],
         },
         quickActions: [
           {
@@ -309,6 +516,17 @@ export class AIService {
         businessPriority: 5,
         followUpRequired: false,
         responseComplexity: 'moderate',
+
+        // Client Health & Sentiment features
+        sentimentScore: 0,
+        emotionalIndicators: [],
+
+        // Priority tiering system
+        priorityLevel: fallbackTier,
+        responseDeadlineHours: fallbackDeadlineHours,
+        responseDeadline: fallbackDeadline,
+        isHighPriorityClient: isHighPriorityClient,
+        requiresImmediateAttention: isHighPriorityClient,
       };
     }
   }
@@ -559,8 +777,8 @@ export class AIService {
         promptId,
         result: content.trim(),
         confidence: 0.8,
-        followUpQuestions: this.generateFollowUpQuestions(promptId, content),
-        actions: this.generateSuggestedActions(promptId, content),
+        followUpQuestions: this.generateFollowUpQuestions(promptId),
+        actions: this.generateSuggestedActions(promptId),
       };
     } catch (error) {
       console.error(`Predefined prompt error (${promptId}):`, error);
@@ -611,7 +829,7 @@ export class AIService {
   /**
    * Generate follow-up questions based on prompt type and result
    */
-  private generateFollowUpQuestions(promptId: string, _result: string): string[] {
+  private generateFollowUpQuestions(promptId: string): string[] {
     const followUpMap: Record<string, string[]> = {
       summarize_key_points: [
         'Would you like me to expand on any specific point?',
@@ -631,7 +849,7 @@ export class AIService {
   /**
    * Generate suggested actions based on prompt type and result
    */
-  private generateSuggestedActions(promptId: string, _result: string): string[] {
+  private generateSuggestedActions(promptId: string): string[] {
     const actionMap: Record<string, string[]> = {
       extract_action_items: ['Add to task list', 'Schedule reminder', 'Delegate items'],
       should_respond: ['Draft response', 'Schedule for later', 'Mark as complete'],

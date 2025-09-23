@@ -43,13 +43,25 @@ export const POST = async (request: NextRequest) => {
       return NextResponse.json({ error: 'Email already classified' }, { status: 409 });
     }
 
-    // Classify email using AI
+    // Fetch user's priority contacts and domains for enhanced classification
+    const [priorityContacts, priorityDomains, userPreferences] = await Promise.all([
+      supabase.from('priority_contacts').select('*').eq('user_id', user.id).eq('is_active', true),
+
+      supabase.from('priority_domains').select('*').eq('user_id', user.id).eq('is_active', true),
+
+      supabase.from('user_preferences').select('*').eq('user_id', user.id).single(),
+    ]);
+
+    // Classify email using AI with priority context
     const classification = await aiService.classifyEmail({
       subject,
       body,
       from,
       userId: user.id,
       emailId,
+      priorityContacts: priorityContacts.data || [],
+      priorityDomains: priorityDomains.data || [],
+      userPreferences: userPreferences.data || undefined,
     });
 
     // Save classification to database with enhanced analysis
@@ -76,6 +88,10 @@ export const POST = async (request: NextRequest) => {
           follow_up_required: classification.followUpRequired || false,
           response_complexity: classification.responseComplexity || 'moderate',
           estimated_time: classification.estimatedTime || 5,
+          // Priority tiering system
+          priority_level: classification.priorityLevel,
+          priority_deadline: classification.responseDeadline,
+          response_status: 'pending',
         },
       ])
       .select()
@@ -108,9 +124,35 @@ export const POST = async (request: NextRequest) => {
       }
     }
 
-    // Update user analytics
+    // Update user analytics and track for client health
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
+    // Extract sentiment score for client health tracking
+    const sentimentScore = classification.businessContext?.sentiment || 0;
+
+    // Update client health score with this interaction
+    try {
+      const healthResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/client-health`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${user.id}`, // Simple auth for internal call
+        },
+        body: JSON.stringify({
+          contactEmail: from,
+          responseTime: 0, // Will be updated when user responds
+          sentimentScore: sentimentScore,
+          classificationId: savedClassification.id,
+        }),
+      });
+
+      if (!healthResponse.ok) {
+        console.warn('Failed to update client health score:', await healthResponse.text());
+      }
+    } catch (error) {
+      console.warn('Client health tracking failed:', error);
+    }
 
     const { error: analyticsError } = await supabase.from('analytics').upsert(
       {
@@ -151,6 +193,15 @@ export const POST = async (request: NextRequest) => {
         quickActions: savedClassification.quick_actions ? JSON.parse(savedClassification.quick_actions) : [],
         followUpRequired: savedClassification.follow_up_required,
         responseComplexity: savedClassification.response_complexity,
+        // Priority tiering system
+        priorityLevel: savedClassification.priority_level,
+        responseDeadline: savedClassification.priority_deadline,
+        responseDeadlineHours: classification.responseDeadlineHours,
+        isHighPriorityClient: classification.isHighPriorityClient,
+        requiresImmediateAttention: classification.requiresImmediateAttention,
+        // Client Health & Sentiment features
+        sentimentScore: classification.businessContext?.sentiment || 0,
+        emotionalIndicators: classification.businessContext?.sentimentIndicators || [],
       },
     });
   } catch (error) {
