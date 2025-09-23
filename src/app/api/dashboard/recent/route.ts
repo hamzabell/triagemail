@@ -64,6 +64,19 @@ export async function GET() {
       preview: email.body ? email.body.substring(0, 100) + (email.body.length > 100 ? '...' : '') : 'No content',
       timeSaved: email.responses?.estimated_time || 0,
       processedAt: email.processed_at || new Date().toISOString(),
+      // Enhanced fields for quick actions
+      quickActions: email.quick_actions ? JSON.parse(email.quick_actions) : [],
+      suggestedResponse: email.responses?.content || null,
+      responseStatus: email.response_status || 'pending',
+      businessPriority: email.business_priority || email.priority || 5,
+      actionItems: email.action_items ? JSON.parse(email.action_items) : [],
+      deadlines: email.deadlines ? JSON.parse(email.deadlines) : [],
+      businessContext: email.business_context ? JSON.parse(email.business_context) : {},
+      followUpRequired: email.follow_up_required || false,
+      responseComplexity: email.response_complexity || 'moderate',
+      estimatedTime: email.estimated_time || 5,
+      priorityLevel: email.priority_level || 'standard',
+      responseDeadline: email.priority_deadline || null,
     }));
 
     return NextResponse.json(formattedEmails);

@@ -290,7 +290,7 @@ export class ClientHealthService {
       const bestTimes = this.analyzeBestResponseTimes(patterns);
 
       // Assess risk based on response patterns
-      const riskAssessment = this.assessResponseRisk(patterns, optimalResponseTime);
+      const riskAssessment = this.assessResponseRisk(patterns);
 
       // Generate recommendations
       const recommendations = await this.generateContactRecommendations(userId, contactEmail);
@@ -405,27 +405,42 @@ export class ClientHealthService {
     // Health score risk
     if (data.healthScore < 40) {
       riskFactors.overall_risk = 'high';
-      riskFactors.factors.push({ type: 'low_health_score', severity: 'high', value: data.healthScore });
+      (riskFactors.factors as Array<{ description: string; severity: string }>).push({
+        description: `Low health score: ${data.healthScore}`,
+        severity: 'high',
+      });
     } else if (data.healthScore < 60) {
       riskFactors.overall_risk = 'medium';
-      riskFactors.factors.push({ type: 'low_health_score', severity: 'medium', value: data.healthScore });
+      (riskFactors.factors as Array<{ description: string; severity: string }>).push({
+        description: `Low health score: ${data.healthScore}`,
+        severity: 'medium',
+      });
     }
 
     // Response time risk
     if (data.responseTime && data.responseTime > 48) {
       riskFactors.overall_risk = riskFactors.overall_risk === 'high' ? 'high' : 'medium';
-      riskFactors.factors.push({ type: 'slow_response', severity: 'medium', value: data.responseTime });
+      (riskFactors.factors as Array<{ description: string; severity: string }>).push({
+        description: `Slow response time: ${data.responseTime}h`,
+        severity: 'medium',
+      });
     }
 
     // Sentiment risk
     if (data.sentiment && data.sentiment < -0.3) {
       riskFactors.overall_risk = riskFactors.overall_risk === 'high' ? 'high' : 'medium';
-      riskFactors.factors.push({ type: 'negative_sentiment', severity: 'high', value: data.sentiment });
+      (riskFactors.factors as Array<{ description: string; severity: string }>).push({
+        description: `Negative sentiment: ${data.sentiment}`,
+        severity: 'high',
+      });
     }
 
     // Frequency risk
     if (data.frequency < 0.5) {
-      riskFactors.factors.push({ type: 'low_frequency', severity: 'low', value: data.frequency });
+      (riskFactors.factors as Array<{ description: string; severity: string }>).push({
+        description: `Low email frequency: ${data.frequency}/month`,
+        severity: 'low',
+      });
     }
 
     return riskFactors;

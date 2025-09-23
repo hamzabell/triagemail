@@ -1,7 +1,7 @@
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ClientHealthScore } from './ClientHealthDashboard';
+import { ClientHealthScore } from '@/types/priority';
 
 interface ResponseTimeChartProps {
   healthScores: ClientHealthScore[];

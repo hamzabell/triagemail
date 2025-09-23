@@ -3,8 +3,18 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Mail, Clock, Target, TrendingUp, AlertTriangle } from 'lucide-react';
+import {
+  Mail,
+  Clock,
+  Target,
+  TrendingUp,
+  AlertTriangle,
+  CheckCircle,
+  Clock as ClockIcon,
+  MessageSquare,
+} from 'lucide-react';
 import { Button } from '../ui/button';
+import QuickActionsButton from './QuickActionsButton';
 
 interface EmailClassification {
   id: string;
@@ -16,6 +26,38 @@ interface EmailClassification {
   timeSaved: number;
   deadline?: string;
   processedAt: string;
+  // Enhanced fields for quick actions
+  quickActions: Array<{
+    type: 'accept' | 'decline' | 'schedule' | 'delegate' | 'follow_up' | 'archive';
+    label: string;
+    description: string;
+    autoResponse?: string;
+  }>;
+  suggestedResponse?: string | null;
+  responseStatus: 'pending' | 'completed' | 'overdue';
+  businessPriority: number;
+  actionItems: Array<{
+    task: string;
+    assignee: 'user' | 'sender' | 'other';
+    urgency: 'high' | 'medium' | 'low';
+    deadline?: string | null;
+  }>;
+  deadlines: Array<{
+    date: string;
+    description: string;
+    confidence: number;
+  }>;
+  businessContext: {
+    communicationType: 'internal' | 'external' | 'customer' | 'partner';
+    businessImpact: 'high' | 'medium' | 'low';
+    sentiment?: number;
+    sentimentIndicators?: string[];
+  };
+  followUpRequired: boolean;
+  responseComplexity: 'simple' | 'moderate' | 'complex';
+  estimatedTime: number;
+  priorityLevel: 'client' | 'vip' | 'urgent' | 'standard' | 'low';
+  responseDeadline?: string | null;
 }
 
 interface DashboardStats {
@@ -57,10 +99,10 @@ export default function TriageMailDashboard() {
           throw new Error('Failed to fetch data');
         }
 
-        const [statsData, emailsData] = await Promise.all([statsRes.json(), emailsRes.json()]);
+        const [statsResponse, emailsResponse] = await Promise.all([statsRes.json(), emailsRes.json()]);
 
-        setStats(statsData);
-        setEmails(emailsData);
+        setStats(statsResponse.data || statsResponse);
+        setEmails(emailsResponse);
         setError(null);
       } catch (err) {
         console.error('Failed to fetch dashboard data:', err);
@@ -83,15 +125,28 @@ export default function TriageMailDashboard() {
       const [statsRes, emailsRes] = await Promise.all([fetch('/api/dashboard/stats'), fetch('/api/dashboard/recent')]);
 
       if (statsRes.ok && emailsRes.ok) {
-        const [statsData, emailsData] = await Promise.all([statsRes.json(), emailsRes.json()]);
-        setStats(statsData);
-        setEmails(emailsData);
+        const [statsResponse, emailsResponse] = await Promise.all([statsRes.json(), emailsRes.json()]);
+        setStats(statsResponse.data || statsResponse);
+        setEmails(emailsResponse);
       }
     } catch (error) {
       console.error('Failed to process emails:', error);
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleActionComplete = (actionType: string, result: { message: string; timestamp: string }) => {
+    // Refresh data after action completion
+    const refreshData = async () => {
+      const [statsRes, emailsRes] = await Promise.all([fetch('/api/dashboard/stats'), fetch('/api/dashboard/recent')]);
+      if (statsRes.ok && emailsRes.ok) {
+        const [statsResponse, emailsResponse] = await Promise.all([statsRes.json(), emailsRes.json()]);
+        setStats(statsResponse.data || statsResponse);
+        setEmails(emailsResponse);
+      }
+    };
+    refreshData();
   };
 
   const getCategoryColor = (category: string) => {
@@ -106,6 +161,34 @@ export default function TriageMailDashboard() {
         return 'bg-[#06D6A0] text-white';
       default:
         return 'bg-gray-500 text-white';
+    }
+  };
+
+  const getPriorityLevelColor = (priorityLevel: string) => {
+    switch (priorityLevel) {
+      case 'client':
+        return 'bg-green-500 text-white';
+      case 'vip':
+        return 'bg-purple-500 text-white';
+      case 'urgent':
+        return 'bg-red-500 text-white';
+      case 'standard':
+        return 'bg-blue-500 text-white';
+      case 'low':
+        return 'bg-gray-500 text-white';
+      default:
+        return 'bg-gray-500 text-white';
+    }
+  };
+
+  const getResponseStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle className="h-3 w-3 text-green-500" />;
+      case 'overdue':
+        return <AlertTriangle className="h-3 w-3 text-red-500" />;
+      default:
+        return <ClockIcon className="h-3 w-3 text-yellow-500" />;
     }
   };
 
@@ -219,8 +302,15 @@ export default function TriageMailDashboard() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <Badge className={getCategoryColor(email.category)}>{email.category}</Badge>
+                      <Badge className={getPriorityLevelColor(email.priorityLevel)}>
+                        {email.priorityLevel.charAt(0).toUpperCase() + email.priorityLevel.slice(1)}
+                      </Badge>
                       <Badge className="border-[#FFD166] text-[#1D3557] bg-[#FFD166]/10">
                         Priority {email.priority}/10
+                      </Badge>
+                      <Badge variant="outline" className="flex items-center gap-1">
+                        {getResponseStatusIcon(email.responseStatus)}
+                        {email.responseStatus}
                       </Badge>
                       {email.deadline && (
                         <Badge variant="destructive">
@@ -231,7 +321,51 @@ export default function TriageMailDashboard() {
                     </div>
                     <h4 className="font-semibold mb-1">{email.subject}</h4>
                     <p className="text-sm text-muted-foreground mb-2">From: {email.from}</p>
-                    <p className="text-sm text-muted-foreground">{email.preview}</p>
+                    <p className="text-sm text-muted-foreground mb-3">{email.preview}</p>
+
+                    {/* Enhanced Information */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3 text-xs">
+                      <div className="flex items-center gap-2">
+                        <Target className="h-3 w-3 text-blue-500" />
+                        <span className="text-muted-foreground">Business Priority:</span>
+                        <Badge variant="outline" className="text-xs">
+                          {email.businessPriority}/10
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-3 w-3 text-green-500" />
+                        <span className="text-muted-foreground">Est. Time:</span>
+                        <Badge variant="outline" className="text-xs">
+                          {email.estimatedTime} min
+                        </Badge>
+                      </div>
+                      {email.actionItems && email.actionItems.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-3 w-3 text-purple-500" />
+                          <span className="text-muted-foreground">Actions:</span>
+                          <Badge variant="outline" className="text-xs">
+                            {email.actionItems.length} items
+                          </Badge>
+                        </div>
+                      )}
+                      {email.followUpRequired && (
+                        <div className="flex items-center gap-2">
+                          <MessageSquare className="h-3 w-3 text-orange-500" />
+                          <span className="text-muted-foreground">Follow-up required</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Quick Actions */}
+                    {email.quickActions && email.quickActions.length > 0 && (
+                      <QuickActionsButton
+                        classificationId={email.id}
+                        quickActions={email.quickActions}
+                        suggestedResponse={email.suggestedResponse || undefined}
+                        onActionComplete={handleActionComplete}
+                      />
+                    )}
+
                     <div className="flex items-center justify-between mt-2">
                       <p className="text-xs text-muted-foreground">
                         Processed: {new Date(email.processedAt).toLocaleString()}

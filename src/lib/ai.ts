@@ -124,7 +124,6 @@ interface PromptResult {
   promptId: string;
   result: string;
   confidence: number;
-  followUpQuestions?: string[];
   actions?: string[];
 }
 
@@ -777,7 +776,6 @@ export class AIService {
         promptId,
         result: content.trim(),
         confidence: 0.8,
-        followUpQuestions: this.generateFollowUpQuestions(promptId),
         actions: this.generateSuggestedActions(promptId),
       };
     } catch (error) {
@@ -824,26 +822,6 @@ export class AIService {
     relevantPrompts.push(this.predefinedPrompts.find((p) => p.id === 'what_did_i_miss')!);
 
     return relevantPrompts;
-  }
-
-  /**
-   * Generate follow-up questions based on prompt type and result
-   */
-  private generateFollowUpQuestions(promptId: string): string[] {
-    const followUpMap: Record<string, string[]> = {
-      summarize_key_points: [
-        'Would you like me to expand on any specific point?',
-        'Should I identify the most critical action item?',
-      ],
-      extract_action_items: [
-        'Would you like me to prioritize these action items?',
-        'Should I suggest deadlines for these actions?',
-      ],
-      should_respond: ['Would you like me to draft a response?', 'Should I check if this needs immediate attention?'],
-      professional_reply: ['Would you like me to make this more concise?', 'Should I add specific next steps?'],
-    };
-
-    return followUpMap[promptId] || [];
   }
 
   /**
